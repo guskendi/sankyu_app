@@ -259,9 +259,9 @@ const MESES_F=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Ag
 const PLATAFORMAS=['Instagram','YouTube','TikTok','Facebook','WhatsApp'];
 const COLOR={roteiro:'#8b7cf6',gravacao:'#5bafd6',edicao:'#e09050',publicacao:'#4caf76'};
 const NEXT_LABEL={roteiro:'Enviar p/ Gravação',gravacao:'Enviar p/ Edição',edicao:'Enviar p/ Publicação',publicacao:'Finalizar'};
-let tipos=['Informativo','Chamada de evento','Chamada de aula experimental','Trecho de apresentação','Trecho de aula','Bastidores / treino'];
+let tipos=[];
 
-let videos=[], professores=[], curTab='esteiras', editProfId=null, editVidId=null, editTipoIdx=null;
+let videos=[], professores=[], curTab='esteiras', editProfId=null, editVidId=null, editTipoId=null;
 let charts={};
 
 async function api(url,method='GET',body=null){
@@ -272,7 +272,8 @@ async function api(url,method='GET',body=null){
 function saving(s){document.getElementById('saving').style.display=s?'inline':'none'}
 
 async function load(){
-  [videos,professores]=await Promise.all([api('/api/videos'),api('/api/professores')]);
+  [videos,professores,tipos]=await Promise.all([api('/api/videos'),api('/api/professores'),api('/api/tipos')]);
+  // tipos from API are objects {id, nome} — keep as objects
   renderAll();
 }
 
@@ -501,7 +502,7 @@ function openAdd(vid){
   populateProfSelect('f-professor');
   // populate tipos
   const tipoSel=document.getElementById('f-tipo');
-  tipoSel.innerHTML='<option value="">Selecione...</option>'+tipos.map(t=>`<option value="${t}">${t}</option>`).join('');
+  tipoSel.innerHTML='<option value="">Selecione...</option>'+tipos.map(t=>`<option value="${t.nome}">${t.nome}</option>`).join('');
   if(vid){
     const v=videos.find(x=>x.id===vid);
     document.getElementById('f-titulo').value=v.titulo;
@@ -790,7 +791,7 @@ function renderDash(){
   const yearOpts=years.map(y=>`<option value="${y}">${y}</option>`).join('');
   const mesOpts='<option value="">Todos os meses</option>'+MESES.map((m,i)=>`<option value="${String(i+1).padStart(2,'0')}">${m}</option>`).join('');
   const profOpts='<option value="">Todos os professores</option>'+professores.map(p=>`<option value="${p.id}">${p.nome} (${p.instrumento})</option>`).join('');
-  const tipoOpts='<option value="">Todos os tipos</option>'+tipos.map(t=>`<option value="${t}">${t}</option>`).join('');
+  const tipoOpts='<option value="">Todos os tipos</option>'+tipos.map(t=>`<option value="${t.nome}">${t.nome}</option>`).join('');
 
   el.innerHTML=`
     <div class="dash-filters">
@@ -931,10 +932,10 @@ function destroyChart(id){if(charts[id]){charts[id].destroy();delete charts[id];
 
 function renderTipos(){
   const el=document.getElementById('pane-tipos');
-  const rows=tipos.map((t,i)=>`<div class="padmin-row">
-    <span class="padmin-nome" style="flex:2">${t}</span>
-    <button class="btn-edit" onclick="openTipoModal(${i})">Editar</button>
-    <button class="btn-del" onclick="delTipo(${i})">Remover</button>
+  const rows=tipos.map(t=>`<div class="padmin-row">
+    <span class="padmin-nome" style="flex:2">${t.nome}</span>
+    <button class="btn-edit" onclick="openTipoModal(${t.id})">Editar</button>
+    <button class="btn-del" onclick="delTipo(${t.id},'${t.nome.replace(/'/g,\"\'\").replace(/"/g,\"&quot;\")}')">Remover</button>
   </div>`).join('');
   el.innerHTML=`
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
@@ -944,31 +945,38 @@ function renderTipos(){
     <div style="background:#111113;border:1px solid #1e1e22;border-radius:12px">${rows||'<div class="empty-msg" style="padding:20px">Nenhum tipo cadastrado.</div>'}</div>`;
 }
 
-function openTipoModal(idx){
-  editTipoIdx=(idx!==undefined)?idx:null;
-  document.getElementById('m-tipo-title').textContent=(editTipoIdx!==null)?'Editar tipo':'Adicionar tipo';
-  document.getElementById('ft-nome').value=(editTipoIdx!==null)?tipos[editTipoIdx]:'';
+function openTipoModal(id){
+  editTipoId=id||null;
+  document.getElementById('m-tipo-title').textContent=editTipoId?'Editar tipo':'Adicionar tipo';
+  const t=editTipoId?tipos.find(x=>x.id===editTipoId):null;
+  document.getElementById('ft-nome').value=t?t.nome:'';
   document.getElementById('m-tipo').style.display='flex';
   setTimeout(()=>document.getElementById('ft-nome').focus(),50);
 }
-function closeTipoModal(){document.getElementById('m-tipo').style.display='none'; editTipoIdx=null;}
+function closeTipoModal(){document.getElementById('m-tipo').style.display='none'; editTipoId=null;}
 
-function submitTipo(){
+async function submitTipo(){
   const nome=document.getElementById('ft-nome').value.trim();
   if(!nome){alert('Informe o nome do tipo.');return;}
-  if(editTipoIdx!==null){
-    tipos[editTipoIdx]=nome;
+  saving(true);
+  if(editTipoId){
+    const upd=await api(`/api/tipos/${editTipoId}`,'PUT',{nome});
+    if(upd.error){alert(upd.error);saving(false);return;}
+    const i=tipos.findIndex(t=>t.id===editTipoId); if(i!==-1) tipos[i]=upd;
   } else {
-    if(tipos.includes(nome)){alert('Este tipo já existe.');return;}
-    tipos.push(nome);
+    const nt=await api('/api/tipos','POST',{nome});
+    if(nt.error){alert(nt.error);saving(false);return;}
+    tipos.push(nt);
   }
-  closeTipoModal(); renderAll();
+  closeTipoModal(); renderAll(); saving(false);
 }
 
-function delTipo(idx){
-  if(!confirm(`Remover o tipo "${tipos[idx]}"?`)) return;
-  tipos.splice(idx,1);
-  renderAll();
+async function delTipo(id,nome){
+  if(!confirm('Remover o tipo "'+nome+'"?')) return;
+  saving(true);
+  await api(`/api/tipos/${id}`,'DELETE');
+  tipos=tipos.filter(t=>t.id!==id);
+  renderAll(); saving(false);
 }
 
 // ── Professores admin ─────────────────────────────────────────────────────────

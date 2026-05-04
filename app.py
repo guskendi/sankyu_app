@@ -28,6 +28,15 @@ class Professor(db.Model):
         return {"id": self.id, "nome": self.nome, "instrumento": self.instrumento, "ativo": self.ativo}
 
 
+class TipoProposito(db.Model):
+    __tablename__ = "tipos_proposito"
+    id   = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    nome = db.Column(db.String(150), nullable=False, unique=True)
+
+    def to_dict(self):
+        return {"id": self.id, "nome": self.nome}
+
+
 class Video(db.Model):
     __tablename__ = "videos"
 
@@ -137,6 +146,37 @@ def delete_professor(pid):
     p = Professor.query.get_or_404(pid); p.ativo = False
     db.session.commit(); return jsonify({"ok": True})
 
+@app.route("/api/tipos", methods=["GET"])
+def list_tipos():
+    return jsonify([t.to_dict() for t in TipoProposito.query.order_by(TipoProposito.nome).all()])
+
+@app.route("/api/tipos", methods=["POST"])
+def create_tipo():
+    data = request.json
+    nome = data.get("nome", "").strip()
+    if not nome:
+        return jsonify({"error": "Nome obrigatório"}), 400
+    if TipoProposito.query.filter_by(nome=nome).first():
+        return jsonify({"error": "Tipo já existe"}), 409
+    t = TipoProposito(nome=nome)
+    db.session.add(t); db.session.commit()
+    return jsonify(t.to_dict()), 201
+
+@app.route("/api/tipos/<int:tid>", methods=["PUT"])
+def update_tipo(tid):
+    t = TipoProposito.query.get_or_404(tid)
+    nome = request.json.get("nome", "").strip()
+    if not nome:
+        return jsonify({"error": "Nome obrigatório"}), 400
+    t.nome = nome; db.session.commit()
+    return jsonify(t.to_dict())
+
+@app.route("/api/tipos/<int:tid>", methods=["DELETE"])
+def delete_tipo(tid):
+    t = TipoProposito.query.get_or_404(tid)
+    db.session.delete(t); db.session.commit()
+    return jsonify({"ok": True})
+
 @app.route("/api/videos", methods=["GET"])
 def list_videos():
     return jsonify([v.to_dict() for v in Video.query.order_by(Video.criado_em.desc()).all()])
@@ -199,9 +239,14 @@ def stats():
 with app.app_context():
     db.create_all()
     if Professor.query.count() == 0:
-        for nome, instr in [("Kenji","Shamisen"),("Yuki","Koto"),("Hana","Shinobue"),
+        for pnome, instr in [("Kenji","Shamisen"),("Yuki","Koto"),("Hana","Shinobue"),
                             ("Taro","Shakuhachi"),("Mika","Taiko"),("Ren","Canto Minyo")]:
-            db.session.add(Professor(nome=nome, instrumento=instr))
+            db.session.add(Professor(nome=pnome, instrumento=instr))
+        db.session.commit()
+    if TipoProposito.query.count() == 0:
+        for tnome in ["Informativo","Chamada de evento","Chamada de aula experimental",
+                     "Trecho de apresentação","Trecho de aula","Bastidores / treino"]:
+            db.session.add(TipoProposito(nome=tnome))
         db.session.commit()
 
 if __name__ == "__main__":
