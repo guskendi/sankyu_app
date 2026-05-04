@@ -44,8 +44,8 @@ label{cursor:pointer}
 .pane.active{display:block}
 
 /* esteiras */
-.egrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-.ecard{background:#111113;border:1px solid #1e1e22;border-radius:12px;padding:14px;display:flex;flex-direction:column;min-height:360px}
+.egrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.ecard{background:#111113;border:1px solid #1e1e22;border-radius:12px;padding:14px;display:flex;flex-direction:column;min-height:360px;min-width:0;overflow:hidden}
 .ecard-hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
 .ecard-icon{font-size:10px;color:#444;font-family:'DM Mono',monospace;margin-bottom:2px}
 .ecard-name{font-size:14px;font-weight:600;color:#e8e4d8}
@@ -55,12 +55,12 @@ label{cursor:pointer}
 .pfill{height:100%;border-radius:2px;transition:width .4s}
 .vlist{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:5px}
 .empty-msg{text-align:center;padding:20px 8px;color:#383838;font-size:12px;font-style:italic}
-.vitem{background:#17171a;border:1px solid #222;border-radius:8px;padding:7px 9px;display:flex;align-items:flex-start;gap:7px;cursor:pointer}
+.vitem{background:#17171a;border:1px solid #222;border-radius:8px;padding:7px 9px;display:flex;align-items:flex-start;gap:7px;cursor:pointer;min-width:0;overflow:hidden}
 .vitem:hover{border-color:#333}
 .chk{width:17px;height:17px;border-radius:50%;border:1px solid #383838;background:transparent;cursor:pointer;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#4caf76}
 .chk.done{border-color:#4caf76;background:#1a3325}
 .chk:disabled{opacity:.3;cursor:default}
-.vtitle{font-size:12px;font-weight:600;color:#e0ddd5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:3px}
+.vtitle{font-size:12px;font-weight:600;color:#e0ddd5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word;margin-bottom:3px;line-height:1.4}
 .tags{display:flex;gap:3px;flex-wrap:wrap}
 .tag{font-size:9px;padding:2px 5px;border-radius:8px}
 .tag-tipo{background:#1e1e22;color:#777;border:1px solid #262628}
