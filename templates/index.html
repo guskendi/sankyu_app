@@ -932,11 +932,14 @@ function destroyChart(id){if(charts[id]){charts[id].destroy();delete charts[id];
 
 function renderTipos(){
   const el=document.getElementById('pane-tipos');
-  const rows=tipos.map(t=>`<div class="padmin-row">
-    <span class="padmin-nome" style="flex:2">${t.nome}</span>
+  const rows=tipos.map(t=>{
+    const nomeEsc=t.nome.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return `<div class="padmin-row">
+    <span class="padmin-nome" style="flex:2">${nomeEsc}</span>
     <button class="btn-edit" onclick="openTipoModal(${t.id})">Editar</button>
-    <button class="btn-del" onclick="delTipo(${t.id},'${t.nome.replace(/'/g,\"\'\").replace(/"/g,\"&quot;\")}')">Remover</button>
-  </div>`).join('');
+    <button class="btn-del" onclick="delTipo(${t.id})">Remover</button>
+  </div>`;
+  }).join('');
   el.innerHTML=`
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <span style="font-size:12px;color:#555;font-family:'DM Mono',monospace">${tipos.length} tipo(s) cadastrado(s)</span>
@@ -971,7 +974,9 @@ async function submitTipo(){
   closeTipoModal(); renderAll(); saving(false);
 }
 
-async function delTipo(id,nome){
+async function delTipo(id){
+  const t=tipos.find(x=>x.id===id);
+  const nome=t?t.nome:'este tipo';
   if(!confirm('Remover o tipo "'+nome+'"?')) return;
   saving(true);
   await api(`/api/tipos/${id}`,'DELETE');
