@@ -227,15 +227,6 @@ function renderAll(){
   else if(curTab==='qrcodes') renderQR();
 }
 
-function sw(tab,btn){
-  curTab=tab;
-  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  document.querySelectorAll('.pane').forEach(p=>p.classList.remove('active'));
-  document.getElementById('pane-'+tab).classList.add('active');
-  renderAll();
-}
-
 // ── Alunos ────────────────────────────────────────────────────────────────────
 
 function renderAlunos(){
@@ -258,12 +249,11 @@ function renderAlunos(){
     </div>
     <div class="tbl-wrap">
       <table class="stbl">
-        <thead><tr><th>Nome</th><th>Contato</th><th>Cadastrado em</th><th style="width:120px"></th></tr></thead>
+        <thead><tr><th>Nome</th><th>Cadastrado em</th><th style="width:80px"></th></tr></thead>
         <tbody>
           ${lista.length===0?`<tr><td colspan="4" class="empty">Nenhum aluno encontrado.</td></tr>`:
           lista.map(a=>`<tr onclick="openFicha(${a.id})">
             <td style="font-weight:600;color:#e0ddd5">${a.nome}</td>
-            <td style="color:#777">${a.contato||'—'}</td>
             <td style="color:#555;font-family:'DM Mono',monospace;font-size:11px">${fmtDate(a.criadoEm)}</td>
             <td onclick="event.stopPropagation()">
               <button class="btn-xs del" onclick="delAluno(${a.id})">Excluir</button>
@@ -533,7 +523,6 @@ async function openFicha(aid){
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
       <div>
         <h3 style="margin:0">${a.nome}</h3>
-        ${a.contato?`<div style="font-size:11px;color:#555;font-family:'DM Mono',monospace;margin-top:3px">${a.contato}</div>`:''}
       </div>
       <span style="font-size:10px;color:#555;font-family:'DM Mono',monospace" id="ficha-hint">Clique em Salvar ficha para confirmar alterações</span>
     </div>
@@ -635,9 +624,10 @@ async function submitEvento(){
   const d=new Date(data+'T12:00:00');
   const titulo=`${tipoLabel} — ${d.toLocaleDateString('pt-BR')}`;
   sav(true);
-  const ne=await api('/api/scout/eventos','POST',{tipo,titulo,data,obs:document.getElementById('fe-obs').value});
-  eventos.unshift(ne);
-  closeModal('m-add-evento'); renderAll(); sav(false);
+  await api('/api/scout/eventos','POST',{tipo,titulo,data,obs:document.getElementById('fe-obs').value});
+  closeModal('m-add-evento');
+  await load();
+  sav(false);
 }
 
 async function delEvento(id){
@@ -703,11 +693,9 @@ async function delPresenca(pid,eid){
   if(!confirm('Remover esta presença?')) return;
   sav(true);
   await api(`/api/scout/presencas/${pid}`,'DELETE');
-  // refresh modal
-  closeModal('m-evento');
-  const i=eventos.findIndex(e=>e.id===eid);
-  if(i!==-1) eventos[i].totalPresencas=Math.max(0,eventos[i].totalPresencas-1);
-  openEvento(eid); sav(false);
+  await load();
+  openEvento(eid);
+  sav(false);
 }
 
 async function addPresencaManual(eventoId){
@@ -716,8 +704,7 @@ async function addPresencaManual(eventoId){
   sav(true);
   const r=await api(`/api/scout/eventos/${eventoId}/presencas`,'POST',{nome:nome.trim()});
   if(r.ok){
-    const i=eventos.findIndex(e=>e.id===eventoId);
-    if(i!==-1) eventos[i].totalPresencas=(eventos[i].totalPresencas||0)+1;
+    await load(); // refresh all data so other users see the new presenca
     openEvento(eventoId);
   } else {
     alert(r.error||'Erro ao adicionar');
@@ -880,7 +867,22 @@ function closeModal(id){document.getElementById(id).style.display='none';}
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 load();
-setInterval(load, 120000);
+
+// Polling inteligente: a cada 30s quando está na aba de eventos (check-ins acontecem ali)
+// e a cada 120s para o resto
+let pollInterval = setInterval(load, 120000);
+
+function sw(tab,btn){
+  curTab=tab;
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.pane').forEach(p=>p.classList.remove('active'));
+  document.getElementById('pane-'+tab).classList.add('active');
+  // polling mais frequente na aba de eventos
+  clearInterval(pollInterval);
+  pollInterval = setInterval(load, tab==='eventos' ? 15000 : 120000);
+  renderAll();
+}
 </script>
 </body>
 </html>
