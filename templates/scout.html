@@ -232,7 +232,6 @@ function renderAll(){
 function renderAlunos(){
   const el=document.getElementById('pane-alunos');
   const q=(document.getElementById('busca-aluno')?.value||'').toLowerCase();
-  const fi=document.getElementById('fil-instr')?.value||'';
   let lista=alunos;
   if(q) lista=lista.filter(a=>a.nome.toLowerCase().includes(q));
 
@@ -240,11 +239,6 @@ function renderAlunos(){
     <div class="filter-row">
       <label>Buscar:</label>
       <input id="busca-aluno" placeholder="Nome do aluno" oninput="renderAlunos()" value="${q}" style="width:220px"/>
-      <label>Instrumento:</label>
-      <select id="fil-instr" onchange="renderAlunos()">
-        <option value="">Todos</option>
-        ${instrumentos.map(i=>`<option value="${i.id}" ${fi==i.id?'selected':''}>${i.nome}</option>`).join('')}
-      </select>
       <span style="font-size:11px;color:#555;font-family:'DM Mono',monospace;margin-left:auto">${lista.length} aluno(s)</span>
     </div>
     <div class="tbl-wrap">
@@ -590,7 +584,10 @@ function renderEventos(){
   el.innerHTML=`
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <span style="font-size:12px;color:#555;font-family:'DM Mono',monospace">${eventos.length} evento(s)</span>
-      <button class="btn-p" onclick="document.getElementById('m-add-evento').style.display='flex';setEvtDataHoje()">+ Criar evento</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn-sec" onclick="load().then(()=>renderEventos())" title="Atualizar lista" style="font-size:16px;padding:6px 12px">↻</button>
+        <button class="btn-p" onclick="document.getElementById('m-add-evento').style.display='flex';setEvtDataHoje()">+ Criar evento</button>
+      </div>
     </div>
     <div class="tbl-wrap">
       <table class="stbl">
