@@ -226,6 +226,11 @@ textarea{resize:vertical}
 <div class="modal wide" id="m-fin-body" onclick="event.stopPropagation()"></div>
 </div>
 
+<!-- Modal finalizados edição -->
+<div class="overlay" id="m-fin-edit" style="display:none" onclick="closeFinEdit()">
+<div class="modal wide" id="m-fin-edit-body" onclick="event.stopPropagation()"></div>
+</div>
+
 <!-- Modal tipos add/edit -->
 <div class="overlay" id="m-tipo" style="display:none" onclick="closeTipoModal()">
 <div class="modal" onclick="event.stopPropagation()">
@@ -695,7 +700,7 @@ function renderFinalizados(){
   const rows=fins.map(v=>{
     const plats=(v.pubPlataformas||[]).map(p=>`<span>${p}</span>`).join('');
     const pubDate=v.pubDate||v.pubData||'';
-    return `<tr onclick="openFinModal('${v.id}')">
+    return `<tr onclick="openFinModal('${v.id}')" ondblclick="openFinEdit('${v.id}')" title="Clique para ver detalhes · Duplo clique para editar">
       <td style="color:#e0ddd5;font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.titulo}</td>
       <td>${fmtDate(v.criadoEm)}</td>
       <td>${v.tipo||'—'}</td>
@@ -707,6 +712,7 @@ function renderFinalizados(){
   el.innerHTML=`
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <span style="font-size:12px;color:#555;font-family:'DM Mono',monospace">${fins.length} vídeo${fins.length!==1?'s':''} finalizados</span>
+      <span style="font-size:11px;color:#444;font-family:'DM Mono',monospace">clique para ver · duplo clique para editar</span>
     </div>
     <div class="fin-wrap">
       <table class="fin-table">
@@ -770,12 +776,107 @@ function openFinModal(vid){
     </div>
     ${fields}
     ${v.obs?`<div class="section-divider">Observações</div><div class="ro-field">${v.obs}</div>`:''}
-    <div style="margin-top:18px;display:flex;justify-content:flex-end">
+    <div style="margin-top:18px;display:flex;gap:8px;justify-content:flex-end">
       <button class="btn-cancel" onclick="closeFinModal()">Fechar</button>
+      <button class="btn-ok" style="flex:0;padding:9px 18px" onclick="closeFinModal();openFinEdit('${v.id}')">✏️ Editar</button>
     </div>`;
   document.getElementById('m-fin').style.display='flex';
 }
 function closeFinModal(){document.getElementById('m-fin').style.display='none';}
+
+// ── Finalizados — edição ──────────────────────────────────────────────────────
+
+function openFinEdit(vid){
+  const v=videos.find(x=>x.id===vid);
+  if(!v) return;
+  const stages=(v.activeStages||[]);
+
+  // populate professor select
+  const profOpts='<option value="">Sem professor específico</option>'+
+    professores.map(p=>`<option value="${p.id}" ${v.professor&&v.professor.id===p.id?'selected':''}>${p.nome} (${p.instrumento})</option>`).join('');
+
+  // populate tipo select
+  const tipoOpts='<option value="">Selecione...</option>'+
+    tipos.map(t=>`<option value="${t.nome}" ${v.tipo===t.nome?'selected':''}>${t.nome}</option>`).join('');
+
+  // plataformas checkboxes
+  const plat=v.pubPlataformas||[];
+  const platCbs=PLATAFORMAS.map(p=>
+    `<label class="plat-cb"><input type="checkbox" ${plat.includes(p)?'checked':''} value="${p}"> ${p}</label>`
+  ).join('');
+
+  // extra fields only for stages the video has
+  let extraFields='';
+  if(stages.includes('roteiro')){
+    extraFields+=`<div class="section-divider">✦ Roteiro do vídeo</div>
+      <div class="fg"><textarea id="fe-roteiro" rows="7" style="min-height:140px" placeholder="Script, falas, contexto...">${(v.roteiroTexto||'').replace(/</g,'&lt;')}</textarea></div>`;
+  }
+  if(stages.includes('gravacao')){
+    extraFields+=`<div class="section-divider">◉ Gravação</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="fg"><label class="fl">Data</label><input id="fe-gdata" type="date" value="${v.gravacaoData||''}"/></div>
+        <div class="fg"><label class="fl">Horário</label><input id="fe-ghor" type="time" value="${v.gravacaoHorario||''}"/></div>
+      </div>
+      <div class="fg"><label class="fl">Local</label><input id="fe-glocal" value="${(v.gravacaoLocal||'').replace(/"/g,'&quot;')}" placeholder="Ex: Estúdio da Sankyu"/></div>`;
+  }
+  if(stages.includes('edicao')){
+    extraFields+=`<div class="section-divider">◈ Arquivo editado</div>
+      <div class="fg"><label class="fl">Caminho no Google Drive</label>
+      <input id="fe-caminho" value="${(v.edicaoCaminho||'').replace(/"/g,'&quot;')}" placeholder="Ex: 2.2 Material Bruto - 2026\\...\\arquivo.mp4"/></div>`;
+  }
+  if(stages.includes('publicacao')){
+    extraFields+=`<div class="section-divider">◆ Publicação</div>
+      <div class="fg"><label class="fl">Data de publicação</label><input id="fe-pubdata" type="date" value="${v.pubData||''}"/></div>
+      <div class="fg"><label class="fl">Plataformas</label><div class="plat-grid" id="fe-plat-grid">${platCbs}</div></div>`;
+  }
+
+  document.getElementById('m-fin-edit-body').setAttribute('style',
+    'border:1px solid #5c4db1;background:#111113;border-radius:14px;padding:22px;width:520px;max-height:90vh;overflow-y:auto');
+  document.getElementById('m-fin-edit-body').innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+      <h3 style="margin:0">✏️ Editar vídeo finalizado</h3>
+      <span class="badge-done">✓ Finalizado</span>
+    </div>
+    <div class="fg"><label class="fl">Título</label>
+      <input id="fe-titulo" value="${v.titulo.replace(/"/g,'&quot;')}"/></div>
+    <div class="fg"><label class="fl">Tipo / propósito</label>
+      <select id="fe-tipo">${tipoOpts}</select></div>
+    <div class="fg"><label class="fl">Professor</label>
+      <select id="fe-prof">${profOpts}</select></div>
+    <div class="fg"><label class="fl">Observações</label>
+      <textarea id="fe-obs" rows="2">${(v.obs||'').replace(/</g,'&lt;')}</textarea></div>
+    ${extraFields}
+    <div class="mactions">
+      <button class="btn-cancel" onclick="closeFinEdit()">Cancelar</button>
+      <button class="btn-ok" onclick="saveFinEdit('${v.id}')">Salvar alterações</button>
+    </div>`;
+  document.getElementById('m-fin-edit').style.display='flex';
+}
+
+function closeFinEdit(){document.getElementById('m-fin-edit').style.display='none';}
+
+async function saveFinEdit(vid){
+  const titulo=document.getElementById('fe-titulo')?.value.trim();
+  if(!titulo){alert('O título não pode estar vazio.');return;}
+
+  const body={titulo};
+  const tipo=document.getElementById('fe-tipo')?.value;      if(tipo!==undefined) body.tipo=tipo;
+  const prof=document.getElementById('fe-prof')?.value;      if(prof!==undefined) body.professor_id=prof||null;
+  const obs=document.getElementById('fe-obs')?.value;        if(obs!==undefined) body.obs=obs;
+  const rt=document.getElementById('fe-roteiro');            if(rt) body.roteiro_texto=rt.value;
+  const gd=document.getElementById('fe-gdata');              if(gd) body.gravacao_data=gd.value;
+  const gh=document.getElementById('fe-ghor');               if(gh) body.gravacao_horario=gh.value;
+  const gl=document.getElementById('fe-glocal');             if(gl) body.gravacao_local=gl.value;
+  const ec=document.getElementById('fe-caminho');            if(ec) body.edicao_caminho=ec.value;
+  const pd=document.getElementById('fe-pubdata');            if(pd) body.pub_data=pd.value;
+  const boxes=document.querySelectorAll('#fe-plat-grid input[type=checkbox]');
+  if(boxes.length>0) body.pub_plataformas=[...boxes].filter(b=>b.checked).map(b=>b.value);
+
+  saving(true);
+  const upd=await api(`/api/videos/${vid}`,'PUT',body);
+  const i=videos.findIndex(v=>v.id===vid); if(i!==-1) videos[i]=upd;
+  closeFinEdit(); renderAll(); saving(false);
+}
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 
