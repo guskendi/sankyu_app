@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Sankyu — Módulo Scout</title>
+<title>Scout — Sankyu</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Serif:wght@400;600;italic&display=swap" rel="stylesheet"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -479,30 +479,40 @@ async function vincularEAbrir(presencaId, alunoId, eventoId){
 
 // ── Ficha do aluno ────────────────────────────────────────────────────────────
 
+// estado original da ficha aberta — para diff
+let fichaOriginal={};
+
 async function openFicha(aid){
   const a=alunos.find(x=>x.id===aid);
   const fichas=await api(`/api/scout/alunos/${aid}/fichas`);
 
-  // group fichas by instrumento
+  // group fichas by instrumento — use string keys for safe lookup
   const byInstr={};
   fichas.forEach(f=>{
-    const k=f.instrumento.id;
+    const k=String(f.instrumento.id);
     if(!byInstr[k]) byInstr[k]={instr:f.instrumento,fichas:[]};
     byInstr[k].fichas.push(f);
+  });
+
+  // Salva estado original para calcular diff no save
+  fichaOriginal={};
+  fichas.forEach(f=>{
+    const key=`${f.instrumento.id}_${f.musica.id}`;
+    fichaOriginal[key]=f.nivel;
   });
 
   // build instrumento blocks
   let instrBlocks='';
   instrumentos.forEach(instr=>{
-    const group=byInstr[instr.id];
+    const group=byInstr[String(instr.id)];
     const rows=musicas.map(m=>{
-      const ficha=group?.fichas.find(f=>f.musica.id===m.id);
-      const nivel=ficha?ficha.nivel:0;
+      const ficha=group?.fichas.find(f=>String(f.musica.id)===String(m.id));
+      const nivel=(ficha!=null)?ficha.nivel:0;
       const fid=ficha?ficha.id:'new';
-      const nivelOpts=NIVEIS.map(n=>`<option value="${n.v}" ${nivel===n.v?'selected':''}>${n.l}</option>`).join('');
+      const nivelOpts=NIVEIS.map(n=>`<option value="${n.v}" ${nivel==n.v?'selected':''}>${n.l}</option>`).join('');
       return `<div class="musica-row">
         <span class="musica-nome-sm">${m.nome}</span>
-        <select class="nivel-select" id="niv-${aid}-${instr.id}-${m.id}" data-fid="${fid}" data-aid="${aid}" data-iid="${instr.id}" data-mid="${m.id}">${nivelOpts}</select>
+        <select class="nivel-select" id="niv-${aid}-${instr.id}-${m.id}" data-fid="${fid}" data-aid="${aid}" data-iid="${instr.id}" data-mid="${m.id}" data-original="${nivel}">${nivelOpts}</select>
       </div>`;
     }).join('');
     instrBlocks+=`<div style="margin-bottom:20px">
@@ -517,38 +527,63 @@ async function openFicha(aid){
         <h3 style="margin:0">${a.nome}</h3>
         ${a.contato?`<div style="font-size:11px;color:#555;font-family:'DM Mono',monospace;margin-top:3px">${a.contato}</div>`:''}
       </div>
-      <span style="font-size:10px;color:#555;font-family:'DM Mono',monospace">Clique em Salvar ficha para confirmar alterações</span>
+      <span style="font-size:10px;color:#555;font-family:'DM Mono',monospace" id="ficha-hint">Clique em Salvar ficha para confirmar alterações</span>
     </div>
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;max-height:60vh;overflow-y:auto">
       ${instrBlocks}
     </div>
     <div class="mactions">
       <button class="btn-cancel" onclick="closeModal('m-ficha')">Fechar</button>
-      <button class="btn-ok" onclick="salvarFicha(${aid})">Salvar ficha</button>
+      <button class="btn-ok" id="btn-salvar-ficha" onclick="salvarFicha(${aid})">Salvar ficha</button>
     </div>`;
+
+  // highlight selects when changed
   document.getElementById('m-ficha').style.display='flex';
+  document.getElementById('m-ficha-body').querySelectorAll('.nivel-select').forEach(sel=>{
+    sel.addEventListener('change',()=>{
+      const changed=parseInt(sel.value)!==parseInt(sel.dataset.original);
+      sel.style.borderColor=changed?'#8b7cf6':'';
+      sel.style.background=changed?'#1a1628':'';
+    });
+  });
 }
 
 async function salvarFicha(aid){
-  // search within the modal to avoid scope issues
   const modal=document.getElementById('m-ficha-body');
-  const sels=modal ? modal.querySelectorAll('.nivel-select') : document.querySelectorAll('.nivel-select');
-  if(sels.length===0){
-    alert('Nenhum campo encontrado. Tente fechar e abrir a ficha novamente.');
-    return;
-  }
-  const items=[];
+  const sels=modal ? modal.querySelectorAll('.nivel-select') : [];
+  if(!sels.length){ alert('Nenhum campo encontrado. Feche e abra a ficha novamente.'); return; }
+
+  // Only send changed values — skip nivel=0 for records that never existed
+  const changed=[];
   sels.forEach(sel=>{
     const iid=parseInt(sel.dataset.iid);
     const mid=parseInt(sel.dataset.mid);
     const nivel=parseInt(sel.value);
-    if(iid && mid) items.push({aluno_id:parseInt(aid), instrumento_id:iid, musica_id:mid, nivel});
+    const original=parseInt(sel.dataset.original);
+    const key=`${iid}_${mid}`;
+    const existsInDB=fichaOriginal.hasOwnProperty(key);
+
+    // Send if: valor mudou OU é novo e não é "Ainda não sei"
+    if(nivel!==original || (nivel>0 && !existsInDB)){
+      changed.push({aluno_id:parseInt(aid), instrumento_id:iid, musica_id:mid, nivel});
+    }
   });
-  if(items.length===0){ alert('Nenhuma ficha para salvar.'); return; }
+
+  if(changed.length===0){
+    alert('Nenhuma alteração detectada.');
+    return;
+  }
+
   sav(true);
-  const r=await api('/api/scout/fichas/bulk','POST',{fichas:items});
-  closeModal('m-ficha'); sav(false);
-  alert(`Ficha salva! ${items.length} registro(s) atualizados.`);
+  const btn=document.getElementById('btn-salvar-ficha');
+  if(btn){ btn.disabled=true; btn.textContent='Salvando...'; }
+
+  const r=await api('/api/scout/fichas/bulk','POST',{fichas:changed});
+
+  closeModal('m-ficha');
+  fichaOriginal={};
+  sav(false);
+  alert(`${changed.length} alteração(ões) salva(s)!`);
 }
 
 // ── Eventos ───────────────────────────────────────────────────────────────────
