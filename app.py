@@ -507,23 +507,31 @@ def scout_delete_ficha(fid):
 
 @app.route("/api/scout/fichas/bulk", methods=["POST"])
 def scout_bulk_fichas():
-    """Salva múltiplas fichas de uma vez (usado no formulário de cadastro)."""
+    """Salva múltiplas fichas de uma vez (usado no formulário de cadastro e ficha do scout)."""
     items = request.json.get("fichas",[])
-    results = []
+    if not items:
+        return jsonify({"ok":True,"count":0})
+    count = 0
     for item in items:
+        aluno_id      = item.get("aluno_id")
+        instrumento_id= item.get("instrumento_id")
+        musica_id     = item.get("musica_id")
+        nivel         = int(item.get("nivel",0))
+        if not all([aluno_id, instrumento_id, musica_id]):
+            continue
         existing = FichaAluno.query.filter_by(
-            aluno_id=item["aluno_id"], instrumento_id=item["instrumento_id"],
-            musica_id=item["musica_id"]).first()
+            aluno_id=aluno_id, instrumento_id=instrumento_id,
+            musica_id=musica_id).first()
         if existing:
-            existing.nivel = int(item.get("nivel",0)); existing.obs = item.get("obs","")
-            existing.atualizado_em = datetime.utcnow(); results.append(existing.to_dict())
+            existing.nivel = nivel
+            existing.atualizado_em = datetime.utcnow()
         else:
-            f = FichaAluno(aluno_id=item["aluno_id"], instrumento_id=item["instrumento_id"],
-                           musica_id=item["musica_id"], nivel=int(item.get("nivel",0)),
-                           obs=item.get("obs",""))
-            db.session.add(f); db.session.flush(); results.append(f.to_dict())
+            db.session.add(FichaAluno(
+                aluno_id=aluno_id, instrumento_id=instrumento_id,
+                musica_id=musica_id, nivel=nivel))
+        count += 1
     db.session.commit()
-    return jsonify(results),201
+    return jsonify({"ok":True,"count":count})
 
 
 # ── Rotas Scout — API eventos ──────────────────────────────────────────────────
