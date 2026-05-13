@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Scout — Sankyu</title>
+<title>Sankyu — Módulo Scout</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Serif:wght@400;600;italic&display=swap" rel="stylesheet"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -113,7 +113,6 @@ button{font-family:inherit;cursor:pointer}
     </div>
     <div class="hdr-right">
       <span class="saving" id="saving" style="display:none">salvando...</span>
-      <a href="/producao" class="btn-sec">→ Produção</a>
       <button class="btn-p" onclick="openAddAluno()">+ Novo aluno</button>
     </div>
   </div>
@@ -624,8 +623,6 @@ async function openEvento(id){
         ? `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
             <span style="font-size:13px;color:#9b7cf6;cursor:pointer;text-decoration:underline;text-underline-offset:3px"
               onclick="closeModal('m-evento');openFicha(${match.id})" title="Abrir ficha de ${match.nome}">${p.nome} ↗</span>
-            ${isLinked ? `<span style="font-size:10px;color:#4caf76;font-family:'DM Mono',monospace;padding:1px 6px;background:#1a3325;border-radius:6px;border:1px solid #2a4e38">vinculado</span>` : 
-              `<span style="font-size:10px;color:#555;font-family:'DM Mono',monospace">(nome igual)</span>`}
             <button class="btn-xs" style="font-size:10px;padding:2px 8px" onclick="openVincular(${p.id},${id},'${nomeEsc}')">trocar</button>
            </div>`
         : `<span style="font-size:13px;color:#c9883a;cursor:pointer;text-decoration:underline;text-underline-offset:3px;text-decoration-style:dashed"
