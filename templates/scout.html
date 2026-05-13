@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Scout — Sankyu</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Serif:wght@400;600;italic&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Serif',serif;background:#0e0e0f;color:#e8e4d8;min-height:100vh}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:#111}::-webkit-scrollbar-thumb{background:#333;border-radius:2px}
+input,select,textarea{background:#1a1a1d;border:1px solid #2a2a2e;border-radius:8px;padding:8px 10px;font-size:13px;color:#e8e4d8;width:100%;outline:none;font-family:inherit}
+input:focus,select:focus,textarea:focus{border-color:#5c4db1}
+select option{background:#1a1a1d}
+button{font-family:inherit;cursor:pointer}
+
+/* layout */
+#wrap{max-width:1100px;margin:0 auto;padding:0 16px 60px}
+.hdr{border-bottom:1px solid #1e1e20;padding:12px 0;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#0e0e0f;z-index:50}
+.hdr-left{display:flex;align-items:center;gap:12px}
+.hdr-logo{height:36px;width:auto}
+.hdr-text .sub{font-size:10px;letter-spacing:.2em;color:#5c4db1;text-transform:uppercase;font-family:'DM Mono',monospace;margin-bottom:2px}
+.hdr-text .title{font-size:17px;font-weight:600}
+.hdr-right{display:flex;gap:8px;align-items:center}
+.saving{font-size:10px;color:#555;font-family:'DM Mono',monospace}
+.btn-p{background:#1a1628;border:1px solid #5c4db1;border-radius:8px;padding:7px 14px;color:#9b7cf6;font-size:12px;font-weight:500;font-family:'DM Mono',monospace}
+.btn-p:hover{background:#221a38}
+.btn-sec{background:none;border:1px solid #2a2a2e;border-radius:8px;padding:7px 12px;color:#888;font-size:12px;font-family:'DM Mono',monospace}
+.btn-sec:hover{border-color:#555;color:#ccc}
+
+/* tabs */
+.tabs{display:flex;border-bottom:1px solid #1e1e20}
+.tab{background:none;border:none;border-bottom:2px solid transparent;color:#555;padding:10px 14px;font-size:12px;font-family:'DM Mono',monospace;letter-spacing:.06em}
+.tab.active{border-bottom-color:#8b7cf6;color:#e8e4d8}
+.tab:hover:not(.active){color:#999}
+.pane{padding:18px 0;display:none}
+.pane.active{display:block}
+
+/* tables */
+.tbl-wrap{background:#111113;border:1px solid #1e1e22;border-radius:12px;overflow:hidden}
+.stbl{width:100%;border-collapse:collapse;font-size:12px}
+.stbl th{text-align:left;padding:8px 12px;font-size:10px;color:#555;font-family:'DM Mono',monospace;letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid #1e1e22;font-weight:400}
+.stbl td{padding:9px 12px;border-bottom:1px solid #17171a;color:#ccc;vertical-align:middle}
+.stbl tr:last-child td{border-bottom:none}
+.stbl tr:hover td{background:#131315;cursor:pointer}
+.btn-xs{background:none;border:1px solid #2a2a2e;border-radius:6px;padding:3px 9px;font-size:11px;color:#888}
+.btn-xs:hover{border-color:#555;color:#ccc}
+.btn-xs.del{border-color:#3a1515;color:#c05050}
+.btn-xs.del:hover{background:#1a0808}
+.empty{text-align:center;padding:32px;color:#444;font-style:italic;font-size:13px}
+
+/* nivel badge */
+.nivel{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-family:'DM Mono',monospace;font-weight:500}
+.n0{background:#1a1a1d;color:#555}
+.n1{background:#1f1628;color:#9b7cf6}
+.n2{background:#1a2535;color:#5bafd6}
+.n3{background:#1f2010;color:#a8c050}
+.n4{background:#1f1509;color:#c9883a}
+.n5{background:#1a3325;color:#4caf76}
+
+/* modal */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:200}
+.modal{background:#111113;border:1px solid #2a2a2e;border-radius:14px;padding:22px;width:480px;max-height:90vh;overflow-y:auto}
+.modal.wide{width:700px}
+.modal.xl{width:900px}
+.modal h3{font-size:15px;font-weight:600;color:#e8e4d8;margin-bottom:18px}
+.fg{margin-bottom:12px}
+.fl{display:block;font-size:10px;color:#555;font-family:'DM Mono',monospace;margin-bottom:5px;letter-spacing:.1em;text-transform:uppercase}
+.mactions{display:flex;gap:8px;margin-top:18px}
+.btn-ok{flex:2;padding:9px;background:#17122a;border:1px solid #5c4db1;border-radius:8px;color:#9b7cf6;font-size:13px;font-weight:600}
+.btn-ok:hover{background:#1f1838}
+.btn-cancel{flex:1;padding:9px;background:none;border:1px solid #2a2a2e;border-radius:8px;color:#666;font-size:13px}
+.btn-cancel:hover{border-color:#444;color:#aaa}
+.btn-del2{padding:9px 14px;background:none;border:1px solid #3a1515;border-radius:8px;color:#c05050;font-size:12px}
+.btn-del2:hover{background:#1a0808}
+
+/* ficha aluno */
+.ficha-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.ficha-instr-hdr{font-size:11px;font-weight:600;color:#8b7cf6;font-family:'DM Mono',monospace;letter-spacing:.06em;text-transform:uppercase;padding:8px 0 4px;border-bottom:1px solid #1e1e22;margin-bottom:6px;grid-column:1/-1}
+.musica-row{display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid #151518}
+.musica-nome-sm{font-size:12px;color:#ccc;flex:1;padding-right:8px}
+.nivel-select{width:auto;min-width:160px;font-size:11px;padding:4px 6px}
+.btn-save-ficha{font-size:11px;padding:3px 10px;background:#17122a;border:1px solid #5c4db1;border-radius:6px;color:#9b7cf6;margin-left:6px}
+.filter-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.filter-row select{width:auto;font-size:12px;padding:6px 10px}
+.filter-row input{width:200px;font-size:12px;padding:6px 10px}
+.filter-row label{font-size:11px;color:#666;font-family:'DM Mono',monospace;white-space:nowrap}
+
+/* eventos */
+.evt-tipo{font-size:9px;padding:2px 7px;border-radius:8px;font-family:'DM Mono',monospace}
+.evt-treino{background:#1a2535;color:#5bafd6;border:1px solid #1e3a50}
+.evt-apresentacao{background:#1a3325;color:#4caf76;border:1px solid #2a4e38}
+.presenca-item{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-bottom:1px solid #17171a}
+.presenca-item:last-child{border-bottom:none}
+
+/* qr section */
+.qr-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.qr-card{background:#111113;border:1px solid #1e1e22;border-radius:12px;padding:20px;text-align:center}
+.qr-card h3{font-size:14px;font-weight:600;margin-bottom:4px}
+.qr-card .sub{font-size:11px;color:#666;font-family:'DM Mono',monospace;margin-bottom:16px}
+.qr-svg{width:210px;height:210px;background:#fff;border-radius:8px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.qr-url{font-size:10px;color:#555;font-family:'DM Mono',monospace;word-break:break-all;margin-bottom:12px}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div class="hdr">
+    <div class="hdr-left">
+      <img class="hdr-logo" src="data:image/png;base64,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" alt="Sankyu"/>
+      <div class="hdr-text">
+        <div class="sub">Escola de Música Japonesa</div>
+        <div class="title">Módulo Scout</div>
+      </div>
+    </div>
+    <div class="hdr-right">
+      <span class="saving" id="saving" style="display:none">salvando...</span>
+      <button class="btn-p" onclick="openAddAluno()">+ Novo aluno</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="sw('alunos',this)">Alunos</button>
+    <button class="tab" onclick="sw('eventos',this)">Eventos</button>
+    <button class="tab" onclick="sw('musicas',this)">Músicas</button>
+    <button class="tab" onclick="sw('instrumentos',this)">Instrumentos</button>
+    <button class="tab" onclick="sw('qrcodes',this)">QR Codes</button>
+  </div>
+
+  <div id="pane-alunos" class="pane active"></div>
+  <div id="pane-eventos" class="pane"></div>
+  <div id="pane-musicas" class="pane"></div>
+  <div id="pane-instrumentos" class="pane"></div>
+  <div id="pane-qrcodes" class="pane"></div>
+</div>
+
+<!-- Modal aluno add/edit -->
+<div class="overlay" id="m-aluno" style="display:none" onclick="closeModal('m-aluno')">
+<div class="modal xl" onclick="event.stopPropagation()" style="width:860px">
+  <h3 id="m-aluno-title">Novo aluno</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+    <div class="fg" style="margin:0"><label class="fl">Nome *</label><input id="fa-nome" placeholder="Nome completo"/></div>
+    <div class="fg" style="margin:0"><label class="fl">Observações</label><input id="fa-obs" placeholder="Opcional"/></div>
+  </div>
+  <div class="fg" style="margin-bottom:14px">
+    <label class="fl">Instrumentos que toca</label>
+    <div id="fa-instr-grid" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+  </div>
+  <div id="fa-rep-area">
+    <div style="font-size:12px;color:#555;font-style:italic;padding:8px 0">Selecione os instrumentos acima para preencher o repertório.</div>
+  </div>
+  <div class="mactions">
+    <button class="btn-cancel" onclick="closeModal('m-aluno')">Cancelar</button>
+    <button class="btn-ok" id="btn-salvar-aluno" onclick="submitAluno()">Salvar aluno</button>
+  </div>
+</div></div>
+
+<!-- Modal vincular presença a aluno -->
+<div class="overlay" id="m-vincular" style="display:none;z-index:300" onclick="closeModal('m-vincular')">
+<div class="modal" onclick="event.stopPropagation()" id="m-vincular-body"></div>
+</div>
+
+<!-- Modal ficha aluno -->
+<div class="overlay" id="m-ficha" style="display:none" onclick="closeModal('m-ficha')">
+<div class="modal xl" onclick="event.stopPropagation()" id="m-ficha-body"></div>
+</div>
+
+<!-- Modal evento detail/presencas -->
+<div class="overlay" id="m-evento" style="display:none" onclick="closeModal('m-evento')">
+<div class="modal wide" onclick="event.stopPropagation()" id="m-evento-body"></div>
+</div>
+
+<!-- Modal add evento manual -->
+<div class="overlay" id="m-add-evento" style="display:none" onclick="closeModal('m-add-evento')">
+<div class="modal" onclick="event.stopPropagation()">
+  <h3>Criar evento manualmente</h3>
+  <div class="fg"><label class="fl">Tipo</label>
+    <select id="fe-tipo"><option value="treino">Treino em Conjunto</option><option value="apresentacao">Apresentação</option></select>
+  </div>
+  <div class="fg"><label class="fl">Data</label><input id="fe-data" type="date"/></div>
+  <div class="fg"><label class="fl">Observações</label><textarea id="fe-obs" rows="2"></textarea></div>
+  <div class="mactions">
+    <button class="btn-cancel" onclick="closeModal('m-add-evento')">Cancelar</button>
+    <button class="btn-ok" onclick="submitEvento()">Criar</button>
+  </div>
+</div></div>
+
+<!-- Modal CRUD simples (musicas/instrumentos) -->
+<div class="overlay" id="m-crud" style="display:none" onclick="closeModal('m-crud')">
+<div class="modal" onclick="event.stopPropagation()">
+  <h3 id="m-crud-title">Item</h3>
+  <div class="fg"><label class="fl">Nome</label><input id="fc-nome"/></div>
+  <div class="mactions">
+    <button class="btn-cancel" onclick="closeModal('m-crud')">Cancelar</button>
+    <button class="btn-ok" onclick="submitCrud()">Salvar</button>
+  </div>
+</div></div>
+
+<script>
+const SENHA = "{{ senha }}";
+const NIVEIS = [{v:0,l:"Ainda não sei"},{v:1,l:"1 — Iniciante"},{v:2,l:"2 — Em evolução"},{v:3,l:"3 — Com acompanhamento"},{v:4,l:"4 — Toca sozinho"},{v:5,l:"5 — Proficiente"}];
+const NIVEL_LABEL = {0:"Ainda não sei",1:"Iniciante",2:"Em evolução",3:"Com acompanhamento",4:"Toca sozinho",5:"Proficiente"};
+const NIVEL_CLASS = {0:"n0",1:"n1",2:"n2",3:"n3",4:"n4",5:"n5"};
+
+let alunos=[], musicas=[], instrumentos=[], eventos=[], curTab='alunos';
+let editAlunoId=null, crudMode=null, crudId=null, crudType=null;
+
+function sav(s){document.getElementById('saving').style.display=s?'inline':'none'}
+
+async function api(url,method='GET',body=null){
+  const opts={method,headers:{'Content-Type':'application/json'}};
+  if(body) opts.body=JSON.stringify(body);
+  const r=await fetch(url,opts); return r.json();
+}
+
+async function load(){
+  [alunos,musicas,instrumentos,eventos]=await Promise.all([
+    api('/api/scout/alunos'),api('/api/scout/musicas'),
+    api('/api/scout/instrumentos'),api('/api/scout/eventos')
+  ]);
+  renderAll();
+}
+
+function renderAll(){
+  if(curTab==='alunos') renderAlunos();
+  else if(curTab==='eventos') renderEventos();
+  else if(curTab==='musicas') renderMusicas();
+  else if(curTab==='instrumentos') renderInstrumentos();
+  else if(curTab==='qrcodes') renderQR();
+}
+
+function sw(tab,btn){
+  curTab=tab;
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.pane').forEach(p=>p.classList.remove('active'));
+  document.getElementById('pane-'+tab).classList.add('active');
+  renderAll();
+}
+
+// ── Alunos ────────────────────────────────────────────────────────────────────
+
+function renderAlunos(){
+  const el=document.getElementById('pane-alunos');
+  const q=(document.getElementById('busca-aluno')?.value||'').toLowerCase();
+  const fi=document.getElementById('fil-instr')?.value||'';
+  let lista=alunos;
+  if(q) lista=lista.filter(a=>a.nome.toLowerCase().includes(q));
+
+  el.innerHTML=`
+    <div class="filter-row">
+      <label>Buscar:</label>
+      <input id="busca-aluno" placeholder="Nome do aluno" oninput="renderAlunos()" value="${q}" style="width:220px"/>
+      <label>Instrumento:</label>
+      <select id="fil-instr" onchange="renderAlunos()">
+        <option value="">Todos</option>
+        ${instrumentos.map(i=>`<option value="${i.id}" ${fi==i.id?'selected':''}>${i.nome}</option>`).join('')}
+      </select>
+      <span style="font-size:11px;color:#555;font-family:'DM Mono',monospace;margin-left:auto">${lista.length} aluno(s)</span>
+    </div>
+    <div class="tbl-wrap">
+      <table class="stbl">
+        <thead><tr><th>Nome</th><th>Contato</th><th>Cadastrado em</th><th style="width:120px"></th></tr></thead>
+        <tbody>
+          ${lista.length===0?`<tr><td colspan="4" class="empty">Nenhum aluno encontrado.</td></tr>`:
+          lista.map(a=>`<tr onclick="openFicha(${a.id})">
+            <td style="font-weight:600;color:#e0ddd5">${a.nome}</td>
+            <td style="color:#777">${a.contato||'—'}</td>
+            <td style="color:#555;font-family:'DM Mono',monospace;font-size:11px">${fmtDate(a.criadoEm)}</td>
+            <td onclick="event.stopPropagation()" style="display:flex;gap:5px">
+              <button class="btn-xs" onclick="openEditAluno(${a.id})">Editar</button>
+              <button class="btn-xs del" onclick="delAluno(${a.id})">Excluir</button>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function fmtDate(iso){
+  if(!iso) return '—';
+  const d=new Date(iso);
+  return d.toLocaleDateString('pt-BR');
+}
+
+// ── Aluno CRUD ────────────────────────────────────────────────────────────────
+
+let alunoInstrSel = new Set();
+
+const NIVEIS_MODAL=[
+  {v:0,l:"Ainda não sei"},{v:1,l:"1 — Iniciante"},{v:2,l:"2 — Em evolução"},
+  {v:3,l:"3 — Com acompanhamento"},{v:4,l:"4 — Toca sozinho"},{v:5,l:"5 — Proficiente"}
+];
+
+function renderAlunoInstrGrid(){
+  const grid=document.getElementById('fa-instr-grid');
+  if(!grid) return;
+  grid.innerHTML=instrumentos.map(i=>`
+    <label style="display:flex;align-items:center;gap:7px;background:${alunoInstrSel.has(i.id)?'#1a1628':'#1a1a1d'};
+      border:1px solid ${alunoInstrSel.has(i.id)?'#5c4db1':'#2a2a2e'};border-radius:8px;padding:7px 12px;cursor:pointer;user-select:none"
+      onclick="toggleAlunoInstr(${i.id},this)">
+      <span style="width:13px;height:13px;border-radius:3px;border:1px solid ${alunoInstrSel.has(i.id)?'#5c4db1':'#444'};
+        background:${alunoInstrSel.has(i.id)?'#5c4db1':'transparent'};display:flex;align-items:center;justify-content:center;
+        font-size:9px;color:#fff;flex-shrink:0">${alunoInstrSel.has(i.id)?'✓':''}</span>
+      <span style="font-size:13px;color:${alunoInstrSel.has(i.id)?'#e8e4d8':'#ccc'}">${i.nome}</span>
+    </label>`).join('');
+}
+
+function toggleAlunoInstr(id){
+  if(alunoInstrSel.has(id)) alunoInstrSel.delete(id);
+  else alunoInstrSel.add(id);
+  renderAlunoInstrGrid();
+  renderAlunoRepGrid();
+}
+
+function renderAlunoRepGrid(){
+  const area=document.getElementById('fa-rep-area');
+  if(!area) return;
+  const sels=[...alunoInstrSel].map(id=>instrumentos.find(i=>i.id===id)).filter(Boolean);
+  if(sels.length===0){
+    area.innerHTML='<div style="font-size:12px;color:#555;font-style:italic;padding:8px 0">Selecione os instrumentos acima para preencher o repertório.</div>';
+    return;
+  }
+  const nivelOpts=NIVEIS_MODAL.map(n=>`<option value="${n.v}">${n.l}</option>`).join('');
+  const thCols=sels.map(i=>`<th style="min-width:150px;color:#9b7cf6;font-size:10px;font-family:'DM Mono',monospace;letter-spacing:.06em;text-transform:uppercase;padding:7px 10px;border-bottom:1px solid #1e1e22;background:#111113;white-space:nowrap">${i.nome}</th>`).join('');
+  const rows=musicas.map(m=>{
+    const tds=sels.map(i=>`<td style="padding:5px 8px;border-bottom:1px solid #151518">
+      <select style="width:100%;background:#1a1a1d;border:1px solid #2a2a2e;border-radius:6px;padding:4px 6px;font-size:11px;color:#e8e4d8;outline:none;font-family:inherit;min-width:140px" data-mid="${m.id}" data-iid="${i.id}" class="fa-nivel">${nivelOpts}</select></td>`).join('');
+    return `<tr><td style="padding:6px 10px;border-bottom:1px solid #151518;font-size:12px;color:#ccc;white-space:nowrap">${m.nome}</td>${tds}</tr>`;
+  }).join('');
+  area.innerHTML=`<div style="max-height:280px;overflow:auto;border-radius:8px;border:1px solid #1e1e22;margin-top:8px">
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr>
+        <th style="min-width:170px;text-align:left;padding:7px 10px;font-size:10px;color:#555;font-family:'DM Mono',monospace;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid #1e1e22;background:#111113;position:sticky;top:0">Música</th>
+        ${thCols}
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+}
+
+function openAddAluno(nomePreenchido=''){
+  editAlunoId=null;
+  alunoInstrSel=new Set();
+  document.getElementById('m-aluno-title').textContent='Novo aluno';
+  document.getElementById('fa-nome').value=nomePreenchido;
+  document.getElementById('fa-obs').value='';
+  document.getElementById('btn-salvar-aluno').textContent='Salvar aluno';
+  renderAlunoInstrGrid();
+  renderAlunoRepGrid();
+  document.getElementById('m-aluno').style.display='flex';
+  setTimeout(()=>document.getElementById('fa-nome').focus(),50);
+}
+
+function openEditAluno(id){
+  editAlunoId=id;
+  alunoInstrSel=new Set();
+  const a=alunos.find(x=>x.id===id);
+  document.getElementById('m-aluno-title').textContent='Editar aluno';
+  document.getElementById('fa-nome').value=a.nome;
+  document.getElementById('fa-obs').value=a.obs||'';
+  document.getElementById('btn-salvar-aluno').textContent='Salvar alterações';
+  renderAlunoInstrGrid();
+  renderAlunoRepGrid();
+  document.getElementById('m-aluno').style.display='flex';
+}
+
+async function submitAluno(){
+  const nome=document.getElementById('fa-nome').value.trim();
+  if(!nome){alert('Nome obrigatório');return;}
+  sav(true);
+  const body={nome,obs:document.getElementById('fa-obs').value};
+  let aid;
+  if(editAlunoId){
+    const upd=await api(`/api/scout/alunos/${editAlunoId}`,'PUT',body);
+    const i=alunos.findIndex(a=>a.id===editAlunoId); if(i!==-1) alunos[i]=upd;
+    aid=editAlunoId;
+  } else {
+    const na=await api('/api/scout/alunos','POST',body);
+    alunos.push(na);
+    aid=na.id;
+  }
+  const nivSels=document.querySelectorAll('.fa-nivel');
+  if(nivSels.length>0){
+    const fichas=[...nivSels].map(s=>({aluno_id:aid,instrumento_id:parseInt(s.dataset.iid),musica_id:parseInt(s.dataset.mid),nivel:parseInt(s.value)}));
+    await api('/api/scout/fichas/bulk','POST',{fichas});
+  }
+  closeModal('m-aluno'); renderAll(); sav(false);
+}
+
+async function delAluno(id){
+  const a=alunos.find(x=>x.id===id);
+  if(!confirm(`Excluir "${a.nome}" e todas as suas fichas?`)) return;
+  sav(true);
+  await api(`/api/scout/alunos/${id}`,'DELETE');
+  alunos=alunos.filter(x=>x.id!==id);
+  renderAll(); sav(false);
+}
+
+// ── Fuzzy name matching ───────────────────────────────────────────────────────
+
+function fuzzyScore(a, b){
+  const ta=a.toLowerCase().trim().split(/\s+/);
+  const tb=b.toLowerCase().trim().split(/\s+/);
+  let hits=0;
+  ta.forEach(w=>{if(tb.some(wb=>wb.startsWith(w)||w.startsWith(wb))) hits++;});
+  return hits/Math.max(ta.length,tb.length);
+}
+
+function findMatches(nome){
+  return alunos
+    .map(a=>({aluno:a,score:fuzzyScore(nome,a.nome)}))
+    .filter(x=>x.score>0.3)
+    .sort((a,b)=>b.score-a.score)
+    .slice(0,5);
+}
+
+function openVincular(presencaId, eventoId, nomePres){
+  const matches=findMatches(nomePres);
+  const body=document.getElementById('m-vincular-body');
+  const nomeEsc=nomePres.replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  const matchRows=matches.length===0
+    ?`<div style="font-size:13px;color:#555;font-style:italic;padding:12px 0">Nenhum aluno com nome parecido encontrado.</div>`
+    :matches.map(({aluno,score})=>`
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;
+        background:#17171a;border:1px solid #222;border-radius:8px;margin-bottom:6px">
+        <div>
+          <div style="font-size:13px;color:#e0ddd5;font-weight:500">${aluno.nome}</div>
+          <div style="font-size:10px;color:#555;font-family:'DM Mono',monospace">${Math.round(score*100)}% parecido</div>
+        </div>
+        <button class="btn-xs" style="border-color:#5c4db1;color:#9b7cf6"
+          onclick="vincularEAbrir(${presencaId},${aluno.id},${eventoId})">Vincular e abrir ficha</button>
+      </div>`).join('');
+
+  body.innerHTML=`
+    <h3 style="margin-bottom:6px">Aluno não identificado</h3>
+    <div style="font-size:12px;color:#777;margin-bottom:14px">
+      Check-in com o nome: <strong style="color:#c9883a">"${nomeEsc}"</strong>
+    </div>
+    ${matches.length>0?'<div style="font-size:11px;color:#555;font-family:\'DM Mono\',monospace;margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Alunos com nome parecido</div>':''}
+    ${matchRows}
+    <div style="border-top:1px solid #1e1e22;margin-top:12px;padding-top:12px">
+      <div style="font-size:11px;color:#555;font-family:'DM Mono',monospace;margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">
+        ${matches.length>0?'Ou cadastrar novo':'Cadastrar novo aluno'}
+      </div>
+      <button class="btn-ok" style="width:100%;padding:9px"
+        onclick="closeModal('m-vincular');closeModal('m-evento');openAddAluno('${nomeEsc}')">
+        + Criar ficha para "${nomeEsc}"
+      </button>
+    </div>
+    <div class="mactions" style="margin-top:12px">
+      <button class="btn-cancel" onclick="voltarParaEvento()">← Voltar ao evento</button>
+      <button class="btn-cancel" onclick="closeModal('m-vincular');closeModal('m-evento')">Fechar tudo</button>
+    </div>`;
+  document.getElementById('m-vincular').style.display='flex';
+  // store eventoId for back navigation
+  document.getElementById('m-vincular').dataset.eventoId=eventoId;
+}
+
+function voltarParaEvento(){
+  closeModal('m-vincular');
+  // m-evento is still open behind, just bring it back into view
+  document.getElementById('m-evento').style.display='flex';
+}
+
+async function vincularEAbrir(presencaId, alunoId, eventoId){
+  // Save the link in the database
+  sav(true);
+  await api(`/api/scout/presencas/${presencaId}/vincular`,'POST',{aluno_id:alunoId});
+  sav(false);
+  // Close modals and open the aluno's ficha
+  closeModal('m-vincular');
+  closeModal('m-evento');
+  // Refresh the evento data in memory
+  const evtIdx=eventos.findIndex(e=>e.id===eventoId);
+  if(evtIdx!==-1){
+    const upd=await api(`/api/scout/eventos/${eventoId}`);
+    eventos[evtIdx]=upd;
+  }
+  openFicha(alunoId);
+}
+
+// ── Ficha do aluno ────────────────────────────────────────────────────────────
+
+async function openFicha(aid){
+  const a=alunos.find(x=>x.id===aid);
+  const fichas=await api(`/api/scout/alunos/${aid}/fichas`);
+
+  // group fichas by instrumento
+  const byInstr={};
+  fichas.forEach(f=>{
+    const k=f.instrumento.id;
+    if(!byInstr[k]) byInstr[k]={instr:f.instrumento,fichas:[]};
+    byInstr[k].fichas.push(f);
+  });
+
+  // build instrumento blocks
+  let instrBlocks='';
+  instrumentos.forEach(instr=>{
+    const group=byInstr[instr.id];
+    const rows=musicas.map(m=>{
+      const ficha=group?.fichas.find(f=>f.musica.id===m.id);
+      const nivel=ficha?ficha.nivel:0;
+      const fid=ficha?ficha.id:'new';
+      const nivelOpts=NIVEIS.map(n=>`<option value="${n.v}" ${nivel===n.v?'selected':''}>${n.l}</option>`).join('');
+      return `<div class="musica-row">
+        <span class="musica-nome-sm">${m.nome}</span>
+        <select class="nivel-select" id="niv-${aid}-${instr.id}-${m.id}" data-fid="${fid}" data-aid="${aid}" data-iid="${instr.id}" data-mid="${m.id}">${nivelOpts}</select>
+      </div>`;
+    }).join('');
+    instrBlocks+=`<div style="margin-bottom:20px">
+      <div style="font-size:12px;font-weight:600;color:#8b7cf6;font-family:'DM Mono',monospace;letter-spacing:.08em;text-transform:uppercase;padding:6px 0;border-bottom:1px solid #1e1e22;margin-bottom:8px">${instr.nome}</div>
+      <div style="max-height:260px;overflow-y:auto">${rows}</div>
+    </div>`;
+  });
+
+  document.getElementById('m-ficha-body').innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+      <div>
+        <h3 style="margin:0">${a.nome}</h3>
+        ${a.contato?`<div style="font-size:11px;color:#555;font-family:'DM Mono',monospace;margin-top:3px">${a.contato}</div>`:''}
+      </div>
+      <span style="font-size:10px;color:#555;font-family:'DM Mono',monospace">Clique em Salvar ficha para confirmar alterações</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;max-height:60vh;overflow-y:auto">
+      ${instrBlocks}
+    </div>
+    <div class="mactions">
+      <button class="btn-cancel" onclick="closeModal('m-ficha')">Fechar</button>
+      <button class="btn-ok" onclick="salvarFicha(${aid})">Salvar ficha</button>
+    </div>`;
+  document.getElementById('m-ficha').style.display='flex';
+}
+
+async function salvarFicha(aid){
+  const sels=document.querySelectorAll(`.nivel-select[data-aid="${aid}"]`);
+  const items=[];
+  sels.forEach(sel=>{
+    items.push({aluno_id:aid,instrumento_id:parseInt(sel.dataset.iid),
+      musica_id:parseInt(sel.dataset.mid),nivel:parseInt(sel.value)});
+  });
+  sav(true);
+  await api('/api/scout/fichas/bulk','POST',{fichas:items});
+  closeModal('m-ficha'); sav(false);
+  alert('Ficha salva!');
+}
+
+// ── Eventos ───────────────────────────────────────────────────────────────────
+
+function renderEventos(){
+  const el=document.getElementById('pane-eventos');
+  el.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <span style="font-size:12px;color:#555;font-family:'DM Mono',monospace">${eventos.length} evento(s)</span>
+      <button class="btn-p" onclick="document.getElementById('m-add-evento').style.display='flex';setEvtDataHoje()">+ Criar evento</button>
+    </div>
+    <div class="tbl-wrap">
+      <table class="stbl">
+        <thead><tr><th>Tipo</th><th>Título</th><th>Data</th><th>Presenças</th><th style="width:120px"></th></tr></thead>
+        <tbody>
+          ${eventos.length===0?`<tr><td colspan="5" class="empty">Nenhum evento ainda.</td></tr>`:
+          eventos.map(e=>`<tr onclick="openEvento(${e.id})">
+            <td><span class="evt-tipo evt-${e.tipo}">${e.tipo==='treino'?'Treino':'Apresentação'}</span></td>
+            <td style="color:#e0ddd5;font-weight:500">${e.titulo}</td>
+            <td style="font-family:'DM Mono',monospace;font-size:11px;color:#777">${fmtDate(e.data+'T12:00:00')}</td>
+            <td style="font-family:'DM Mono',monospace;font-size:12px;color:#9b7cf6">${e.totalPresencas}</td>
+            <td onclick="event.stopPropagation()">
+              <button class="btn-xs del" onclick="delEvento(${e.id})">Excluir</button>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function setEvtDataHoje(){
+  const hoje=new Date().toISOString().split('T')[0];
+  document.getElementById('fe-data').value=hoje;
+}
+
+async function submitEvento(){
+  const tipo=document.getElementById('fe-tipo').value;
+  const data=document.getElementById('fe-data').value;
+  if(!data){alert('Informe a data');return;}
+  const tipoLabel=tipo==='treino'?'Treino em Conjunto':'Apresentação';
+  const d=new Date(data+'T12:00:00');
+  const titulo=`${tipoLabel} — ${d.toLocaleDateString('pt-BR')}`;
+  sav(true);
+  const ne=await api('/api/scout/eventos','POST',{tipo,titulo,data,obs:document.getElementById('fe-obs').value});
+  eventos.unshift(ne);
+  closeModal('m-add-evento'); renderAll(); sav(false);
+}
+
+async function delEvento(id){
+  const e=eventos.find(x=>x.id===id);
+  if(!confirm(`Excluir o evento "${e.titulo}" e todas as presenças?`)) return;
+  sav(true);
+  await api(`/api/scout/eventos/${id}`,'DELETE');
+  eventos=eventos.filter(x=>x.id!==id);
+  renderAll(); sav(false);
+}
+
+async function openEvento(id){
+  const d=await api(`/api/scout/eventos/${id}`);
+  const ps=d.presencas||[];
+
+  // build presence items with clickable name that tries to find matching aluno
+  const presItems=ps.length===0?'<div class="empty">Nenhuma presença registrada.</div>':
+    ps.map(p=>{
+      // find aluno by name (case-insensitive, trimmed)
+      // 1st priority: linked via DB (alunoId saved), 2nd: exact name match
+      const linked = p.alunoId ? alunos.find(a=>a.id===p.alunoId) : null;
+      const match = linked || alunos.find(a=>a.nome.trim().toLowerCase()===p.nome.trim().toLowerCase());
+      const nomeEsc=p.nome.replace(/'/g,"&#39;").replace(/"/g,"&quot;");
+      const isLinked = !!p.alunoId; // saved in DB
+      const nomeHtml=match
+        ? `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <span style="font-size:13px;color:#9b7cf6;cursor:pointer;text-decoration:underline;text-underline-offset:3px"
+              onclick="closeModal('m-evento');openFicha(${match.id})" title="Abrir ficha de ${match.nome}">${p.nome} ↗</span>
+            <button class="btn-xs" style="font-size:10px;padding:2px 8px" onclick="openVincular(${p.id},${id},'${nomeEsc}')">trocar</button>
+           </div>`
+        : `<span style="font-size:13px;color:#c9883a;cursor:pointer;text-decoration:underline;text-underline-offset:3px;text-decoration-style:dashed"
+            onclick="openVincular(${p.id},${id},'${nomeEsc}')" title="Clique para identificar este aluno">${p.nome}
+            <span style="font-size:10px;color:#c9883a;font-family:'DM Mono',monospace;margin-left:4px">? identificar ↗</span></span>`;
+      return `<div class="presenca-item">
+        ${nomeHtml}
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:10px;color:#555;font-family:'DM Mono',monospace">${fmtDate(p.criadoEm)}</span>
+          <button class="btn-xs del" onclick="delPresenca(${p.id},${id})">Remover</button>
+        </div>
+      </div>`;
+    }).join('');
+
+  document.getElementById('m-evento-body').innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+      <div>
+        <h3 style="margin:0">${d.titulo}</h3>
+        <div style="font-size:11px;color:#555;font-family:'DM Mono',monospace;margin-top:4px">${fmtDate(d.data+'T12:00:00')} · ${ps.length} presença(s)</div>
+      </div>
+      <span class="evt-tipo evt-${d.tipo}">${d.tipo==='treino'?'Treino':'Apresentação'}</span>
+    </div>
+    ${ps.length>0?'<div style="font-size:11px;color:#555;font-family:\'DM Mono\',monospace;margin-bottom:8px">Roxo = identificado · Laranja = não identificado (clique para vincular)</div>':''}
+    <div style="background:#17171a;border:1px solid #222;border-radius:10px;max-height:400px;overflow-y:auto">
+      ${presItems}
+    </div>
+    ${d.obs?`<div style="font-size:12px;color:#555;font-style:italic;margin-top:10px">${d.obs}</div>`:''}
+    <div class="mactions" style="margin-top:14px">
+      <button class="btn-cancel" onclick="closeModal('m-evento')">Fechar</button>
+      <button class="btn-ok" style="flex:1" onclick="addPresencaManual(${d.id})">+ Adicionar presença</button>
+    </div>`;
+  document.getElementById('m-evento').style.display='flex';
+}
+
+async function delPresenca(pid,eid){
+  if(!confirm('Remover esta presença?')) return;
+  sav(true);
+  await api(`/api/scout/presencas/${pid}`,'DELETE');
+  // refresh modal
+  closeModal('m-evento');
+  const i=eventos.findIndex(e=>e.id===eid);
+  if(i!==-1) eventos[i].totalPresencas=Math.max(0,eventos[i].totalPresencas-1);
+  openEvento(eid); sav(false);
+}
+
+async function addPresencaManual(eventoId){
+  const nome=prompt('Nome do aluno a adicionar:');
+  if(!nome||!nome.trim()) return;
+  sav(true);
+  const r=await api(`/api/scout/eventos/${eventoId}/presencas`,'POST',{nome:nome.trim()});
+  if(r.ok){
+    const i=eventos.findIndex(e=>e.id===eventoId);
+    if(i!==-1) eventos[i].totalPresencas=(eventos[i].totalPresencas||0)+1;
+    openEvento(eventoId);
+  } else {
+    alert(r.error||'Erro ao adicionar');
+  }
+  sav(false);
+}
+
+// ── Músicas ───────────────────────────────────────────────────────────────────
+
+function renderMusicas(){
+  const el=document.getElementById('pane-musicas');
+  el.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <span style="font-size:12px;color:#555;font-family:'DM Mono',monospace">${musicas.length} música(s)</span>
+      <button class="btn-p" onclick="openCrud('musica')">+ Adicionar música</button>
+    </div>
+    <div class="tbl-wrap">
+      <table class="stbl">
+        <thead><tr><th>#</th><th>Nome</th><th style="width:120px"></th></tr></thead>
+        <tbody>
+          ${musicas.map((m,i)=>`<tr>
+            <td style="color:#555;font-family:'DM Mono',monospace">${i+1}</td>
+            <td style="color:#e0ddd5">${m.nome}</td>
+            <td style="display:flex;gap:5px">
+              <button class="btn-xs" onclick="openCrud('musica',${m.id},'${m.nome.replace(/'/g,"\\'")}')">Editar</button>
+              <button class="btn-xs del" onclick="delCrud('musica',${m.id},'${m.nome.replace(/'/g,"\\'")}')">Excluir</button>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// ── Instrumentos ──────────────────────────────────────────────────────────────
+
+function renderInstrumentos(){
+  const el=document.getElementById('pane-instrumentos');
+  el.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <span style="font-size:12px;color:#555;font-family:'DM Mono',monospace">${instrumentos.length} instrumento(s)</span>
+      <button class="btn-p" onclick="openCrud('instrumento')">+ Adicionar instrumento</button>
+    </div>
+    <div class="tbl-wrap">
+      <table class="stbl">
+        <thead><tr><th>Nome</th><th style="width:120px"></th></tr></thead>
+        <tbody>
+          ${instrumentos.map(i=>`<tr>
+            <td style="color:#e0ddd5;font-weight:500">${i.nome}</td>
+            <td style="display:flex;gap:5px">
+              <button class="btn-xs" onclick="openCrud('instrumento',${i.id},'${i.nome.replace(/'/g,"\\'")}')">Editar</button>
+              <button class="btn-xs del" onclick="delCrud('instrumento',${i.id},'${i.nome.replace(/'/g,"\\'")}')">Excluir</button>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// ── CRUD genérico (músicas + instrumentos) ────────────────────────────────────
+
+function openCrud(type, id=null, nome=''){
+  crudType=type; crudId=id;
+  const label=type==='musica'?'Música':'Instrumento';
+  document.getElementById('m-crud-title').textContent=id?`Editar ${label}`:`Nova ${label}`;
+  document.getElementById('fc-nome').value=nome;
+  document.getElementById('m-crud').style.display='flex';
+  setTimeout(()=>document.getElementById('fc-nome').focus(),50);
+}
+
+async function submitCrud(){
+  const nome=document.getElementById('fc-nome').value.trim();
+  if(!nome){alert('Nome obrigatório');return;}
+  sav(true);
+  const base=crudType==='musica'?'/api/scout/musicas':'/api/scout/instrumentos';
+  if(crudId){
+    const upd=await api(`${base}/${crudId}`,'PUT',{nome});
+    if(upd.error){alert(upd.error);sav(false);return;}
+    const arr=crudType==='musica'?musicas:instrumentos;
+    const i=arr.findIndex(x=>x.id===crudId); if(i!==-1) arr[i]=upd;
+  } else {
+    const ni=await api(base,'POST',{nome});
+    if(ni.error){alert(ni.error);sav(false);return;}
+    if(crudType==='musica') musicas.push(ni); else instrumentos.push(ni);
+  }
+  closeModal('m-crud'); renderAll(); sav(false);
+}
+
+async function delCrud(type,id,nome){
+  if(!confirm(`Excluir "${nome}"?`)) return;
+  sav(true);
+  const base=type==='musica'?'/api/scout/musicas':'/api/scout/instrumentos';
+  await api(`${base}/${id}`,'DELETE');
+  if(type==='musica') musicas=musicas.filter(x=>x.id!==id);
+  else instrumentos=instrumentos.filter(x=>x.id!==id);
+  renderAll(); sav(false);
+}
+
+// ── QR Codes ──────────────────────────────────────────────────────────────────
+
+async function renderQR(){
+  const el=document.getElementById('pane-qrcodes');
+  el.innerHTML=`
+    <p style="font-size:13px;color:#777;margin-bottom:20px">QR codes permanentes — nunca mudam. Ao ser escaneado, o sistema age automaticamente.</p>
+    <div class="qr-cards" style="grid-template-columns:repeat(3,1fr)">
+      <div class="qr-card">
+        <h3>🥁 Treino em Conjunto</h3>
+        <div class="sub">Check-in nos treinos semanais</div>
+        <div class="qr-svg" id="qr-treino"><span style="color:#444;font-size:12px">carregando...</span></div>
+        <div class="qr-url" id="qr-treino-url">—</div>
+        <button class="btn-p" onclick="printQR('treino','Treino em Conjunto')">Imprimir / Salvar</button>
+      </div>
+      <div class="qr-card">
+        <h3>🎌 Apresentação</h3>
+        <div class="sub">Check-in nas apresentações</div>
+        <div class="qr-svg" id="qr-apresentacao"><span style="color:#444;font-size:12px">carregando...</span></div>
+        <div class="qr-url" id="qr-apresentacao-url">—</div>
+        <button class="btn-p" onclick="printQR('apresentacao','Apresentação')">Imprimir / Salvar</button>
+      </div>
+      <div class="qr-card">
+        <h3>📋 Ficha do Aluno</h3>
+        <div class="sub">Cadastro inicial do repertório</div>
+        <div class="qr-svg" id="qr-cadastro"><span style="color:#444;font-size:12px">carregando...</span></div>
+        <div class="qr-url" id="qr-cadastro-url">—</div>
+        <button class="btn-p" onclick="printQR('cadastro','Ficha do Aluno')">Imprimir / Salvar</button>
+      </div>
+    </div>`;
+
+  for(const tipo of ['treino','apresentacao','cadastro']){
+    const d=await api(`/api/scout/qrcode/${tipo}`);
+    if(d.svg){
+      // inject SVG directly, styled to fill container
+      const wrapped=d.svg.replace('<svg ', '<svg style="width:100%;height:100%" ');
+      document.getElementById(`qr-${tipo}`).innerHTML=wrapped;
+      document.getElementById(`qr-${tipo}-url`).textContent=d.url;
+    } else if(d.error){
+      document.getElementById(`qr-${tipo}`).innerHTML=`<span style="color:#e05c5c;font-size:11px">${d.error}</span>`;
+    }
+  }
+}
+
+function printQR(tipo, label){
+  const el=document.getElementById(`qr-${tipo}`);
+  const svg=el.querySelector('svg');
+  if(!svg){alert('QR code ainda carregando...');return;}
+  const url=document.getElementById(`qr-${tipo}-url`).textContent;
+  const svgStr=new XMLSerializer().serializeToString(svg);
+  const w=window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><body style="text-align:center;font-family:sans-serif;padding:40px;margin:0">
+    <h2 style="margin-bottom:6px">Sankyu — ${label}</h2>
+    <p style="color:#666;margin-bottom:20px;font-size:14px">${tipo==='cadastro'?'Escaneie para preencher sua ficha de repertório':'Escaneie para registrar sua presença'}</p>
+    <div style="width:280px;height:280px;margin:0 auto">${svgStr}</div>
+    <p style="margin-top:16px;font-size:11px;color:#999;word-break:break-all">${url}</p>
+    <script>window.onload=()=>window.print()<\/script>
+  </body></html>`);
+}
+
+// ── Utilitários ───────────────────────────────────────────────────────────────
+
+function closeModal(id){document.getElementById(id).style.display='none';}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+load();
+setInterval(load, 60000);
+</script>
+</body>
+</html>

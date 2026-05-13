@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Ficha de Repertório — Sankyu</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Serif:wght@400;600&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Serif',serif;background:#0e0e0f;color:#e8e4d8;min-height:100vh;padding:24px 16px 80px}
+.wrap{max-width:860px;margin:0 auto}
+
+/* header */
+.hdr{text-align:center;margin-bottom:28px}
+.hdr .emoji{font-size:40px;margin-bottom:8px}
+.hdr h1{font-size:22px;font-weight:600;margin-bottom:4px}
+.hdr p{font-size:13px;color:#666;line-height:1.5}
+
+/* cards */
+.card{background:#111113;border:1px solid #1e1e22;border-radius:12px;padding:20px;margin-bottom:16px}
+.card-title{font-size:11px;font-weight:600;color:#8b7cf6;font-family:'DM Mono',monospace;letter-spacing:.1em;text-transform:uppercase;margin-bottom:14px}
+
+/* form fields */
+.fg{margin-bottom:12px}
+.fl{display:block;font-size:10px;color:#555;font-family:'DM Mono',monospace;letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px}
+input[type=text]{width:100%;background:#1a1a1d;border:1px solid #2a2a2e;border-radius:8px;padding:10px 14px;font-size:14px;color:#e8e4d8;outline:none;font-family:inherit}
+input[type=text]:focus{border-color:#5c4db1}
+textarea{width:100%;background:#1a1a1d;border:1px solid #2a2a2e;border-radius:8px;padding:10px 14px;font-size:13px;color:#e8e4d8;outline:none;font-family:inherit;resize:vertical;min-height:60px}
+textarea:focus{border-color:#5c4db1}
+
+/* instrument checkboxes */
+.instr-grid{display:flex;gap:8px;flex-wrap:wrap}
+.instr-cb{display:flex;align-items:center;gap:8px;background:#1a1a1d;border:1px solid #2a2a2e;border-radius:8px;padding:8px 14px;cursor:pointer;transition:border-color .15s,background .15s;user-select:none}
+.instr-cb:hover{border-color:#5c4db1}
+.instr-cb.selected{background:#1a1628;border-color:#5c4db1}
+.instr-cb input{display:none}
+.instr-cb .check{width:14px;height:14px;border-radius:3px;border:1px solid #444;display:flex;align-items:center;justify-content:center;font-size:9px;flex-shrink:0;transition:all .15s}
+.instr-cb.selected .check{background:#5c4db1;border-color:#5c4db1;color:#fff}
+.instr-cb .label{font-size:13px;color:#ccc}
+.instr-cb.selected .label{color:#e8e4d8}
+
+/* repertório grid */
+.rep-hint{font-size:12px;color:#555;margin-bottom:14px;font-style:italic}
+.rep-table-wrap{overflow-x:auto;border-radius:10px;border:1px solid #1e1e22}
+.rep-table{width:100%;border-collapse:collapse;font-size:12px;min-width:400px}
+.rep-table th{padding:8px 12px;font-size:10px;color:#555;font-family:'DM Mono',monospace;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid #1e1e22;background:#111113;white-space:nowrap;position:sticky;top:0}
+.rep-table th.instr-th{color:#9b7cf6;min-width:150px}
+.rep-table td{padding:7px 10px;border-bottom:1px solid #151518;vertical-align:middle}
+.rep-table tr:last-child td{border-bottom:none}
+.rep-table tr:hover td{background:#131315}
+.musica-nome{font-size:12px;color:#ccc;white-space:nowrap}
+.nivel-sel{width:100%;background:#1a1a1d;border:1px solid #2a2a2e;border-radius:6px;padding:5px 8px;font-size:11px;color:#e8e4d8;outline:none;font-family:inherit;min-width:140px}
+.nivel-sel:focus{border-color:#5c4db1}
+.nivel-sel option{background:#1a1a1d}
+.no-instr{text-align:center;padding:32px;color:#444;font-style:italic;font-size:13px}
+
+/* submit */
+.btn-submit{width:100%;background:#17122a;border:1px solid #5c4db1;border-radius:10px;padding:14px;color:#9b7cf6;font-size:15px;font-weight:600;cursor:pointer;font-family:'DM Mono',monospace;margin-top:4px}
+.btn-submit:hover{background:#221a38}
+.btn-submit:disabled{opacity:.5;cursor:default}
+.msg{padding:16px;border-radius:10px;text-align:center;font-size:14px;font-family:'DM Mono',monospace;margin-top:12px}
+.msg.ok{background:#1a3325;border:1px solid #2a4e38;color:#4caf76}
+.msg.err{background:#2d1515;border:1px solid #5c2020;color:#e05c5c}
+.loading{text-align:center;padding:60px;color:#444;font-family:'DM Mono',monospace}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hdr">
+    <div class="emoji">🎵</div>
+    <h1>Ficha de Repertório</h1>
+    <p>Sankyu — Escola de Música Japonesa<br/>Preencha seus dados e informe seu nível em cada música.</p>
+  </div>
+
+  <div id="loading" class="loading">Carregando...</div>
+
+  <div id="form-area" style="display:none">
+
+    <!-- Dados pessoais -->
+    <div class="card">
+      <div class="card-title">Seus dados</div>
+      <div class="fg">
+        <label class="fl">Nome completo *</label>
+        <input type="text" id="nome" placeholder="Seu nome completo" autocomplete="name"/>
+      </div>
+      <div class="fg">
+        <label class="fl">Observações</label>
+        <textarea id="obs" placeholder="Informações adicionais (opcional)"></textarea>
+      </div>
+    </div>
+
+    <!-- Seleção de instrumentos -->
+    <div class="card">
+      <div class="card-title">Instrumentos que você toca</div>
+      <p style="font-size:12px;color:#666;margin-bottom:12px">Selecione todos os instrumentos que você toca. Você poderá informar seu nível em cada música para cada instrumento.</p>
+      <div class="instr-grid" id="instr-grid"></div>
+    </div>
+
+    <!-- Tabela de repertório -->
+    <div class="card">
+      <div class="card-title">Repertório — níveis por instrumento</div>
+      <p class="rep-hint" id="rep-hint">Selecione seus instrumentos acima para preencher os níveis.</p>
+      <div id="rep-area"></div>
+    </div>
+
+    <button class="btn-submit" id="btn-sub" onclick="submeter()">Enviar ficha</button>
+    <div id="msg" style="display:none"></div>
+
+  </div>
+</div>
+
+<script>
+let instrumentos=[], musicas=[], instrSelecionados=new Set();
+
+const NIVEIS=[
+  {v:0,l:"Ainda não sei"},
+  {v:1,l:"1 — Iniciante"},
+  {v:2,l:"2 — Em evolução"},
+  {v:3,l:"3 — Com acompanhamento"},
+  {v:4,l:"4 — Toca sozinho"},
+  {v:5,l:"5 — Proficiente"},
+];
+
+async function init(){
+  const [ri,rm]=await Promise.all([fetch('/api/scout/instrumentos'),fetch('/api/scout/musicas')]);
+  instrumentos=await ri.json();
+  musicas=await rm.json();
+  document.getElementById('loading').style.display='none';
+  document.getElementById('form-area').style.display='block';
+  renderInstrGrid();
+}
+
+function renderInstrGrid(){
+  const grid=document.getElementById('instr-grid');
+  grid.innerHTML=instrumentos.map(i=>`
+    <label class="instr-cb ${instrSelecionados.has(i.id)?'selected':''}" onclick="toggleInstr(${i.id},this)">
+      <span class="check">${instrSelecionados.has(i.id)?'✓':''}</span>
+      <span class="label">${i.nome}</span>
+    </label>
+  `).join('');
+}
+
+function toggleInstr(id, el){
+  if(instrSelecionados.has(id)){
+    instrSelecionados.delete(id);
+    el.classList.remove('selected');
+    el.querySelector('.check').textContent='';
+  } else {
+    instrSelecionados.add(id);
+    el.classList.add('selected');
+    el.querySelector('.check').textContent='✓';
+  }
+  renderRepGrid();
+}
+
+function renderRepGrid(){
+  const area=document.getElementById('rep-area');
+  const hint=document.getElementById('rep-hint');
+  const sels=[...instrSelecionados].map(id=>instrumentos.find(i=>i.id===id)).filter(Boolean);
+
+  if(sels.length===0){
+    hint.style.display='block';
+    area.innerHTML='';
+    return;
+  }
+  hint.style.display='none';
+
+  // Build table: rows = musicas, cols = selected instrumentos
+  const nivelOpts=NIVEIS.map(n=>`<option value="${n.v}">${n.l}</option>`).join('');
+  const thCols=sels.map(i=>`<th class="instr-th">${i.nome}</th>`).join('');
+  const rows=musicas.map(m=>{
+    const tds=sels.map(i=>`
+      <td>
+        <select class="nivel-sel" data-mid="${m.id}" data-iid="${i.id}">
+          ${nivelOpts}
+        </select>
+      </td>`).join('');
+    return `<tr>
+      <td class="musica-nome">${m.nome}</td>
+      ${tds}
+    </tr>`;
+  }).join('');
+
+  area.innerHTML=`
+    <div class="rep-table-wrap">
+      <table class="rep-table">
+        <thead><tr>
+          <th style="min-width:180px;text-align:left">Música</th>
+          ${thCols}
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+async function submeter(){
+  const nome=document.getElementById('nome').value.trim();
+  if(!nome){showMsg('Por favor, informe seu nome.','err');return;}
+  if(instrSelecionados.size===0){showMsg('Selecione ao menos um instrumento.','err');return;}
+
+  // collect all nivel values
+  const fichas=[];
+  document.querySelectorAll('.nivel-sel').forEach(sel=>{
+    fichas.push({
+      instrumento_id:parseInt(sel.dataset.iid),
+      musica_id:parseInt(sel.dataset.mid),
+      nivel:parseInt(sel.value)
+    });
+  });
+
+  const btn=document.getElementById('btn-sub');
+  btn.disabled=true; btn.textContent='Enviando...';
+
+  try{
+    const r=await fetch('/api/cadastro',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({nome,obs:document.getElementById('obs').value,fichas})});
+    const d=await r.json();
+    if(d.ok){
+      showMsg(`✓ Ficha enviada com sucesso! Obrigado, ${nome}.`,'ok');
+      document.getElementById('form-area').style.opacity='.4';
+      document.getElementById('form-area').style.pointerEvents='none';
+    } else {
+      showMsg(d.error||'Erro ao enviar. Tente novamente.','err');
+      btn.disabled=false; btn.textContent='Enviar ficha';
+    }
+  }catch(e){
+    showMsg('Erro de conexão. Tente novamente.','err');
+    btn.disabled=false; btn.textContent='Enviar ficha';
+  }
+}
+
+function showMsg(text,type){
+  const el=document.getElementById('msg');
+  el.className='msg '+type; el.textContent=text; el.style.display='block';
+  el.scrollIntoView({behavior:'smooth'});
+}
+
+init();
+</script>
+</body>
+</html>

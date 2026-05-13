@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Check-in — Sankyu</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Serif:wght@400;600&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Serif',serif;background:#0e0e0f;color:#e8e4d8;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{background:#111113;border:1px solid #2a2a2e;border-radius:20px;padding:40px 32px;width:100%;max-width:380px;text-align:center}
+.emoji{font-size:48px;margin-bottom:16px}
+.tipo-label{font-size:11px;letter-spacing:.2em;text-transform:uppercase;font-family:'DM Mono',monospace;color:#8b7cf6;margin-bottom:8px}
+h1{font-size:24px;font-weight:600;color:#e8e4d8;margin-bottom:6px}
+.data{font-size:14px;color:#666;font-family:'DM Mono',monospace;margin-bottom:32px}
+input{width:100%;background:#1a1a1d;border:1px solid #2a2a2e;border-radius:10px;padding:14px 16px;font-size:16px;color:#e8e4d8;outline:none;font-family:inherit;margin-bottom:12px;text-align:center}
+input:focus{border-color:#5c4db1}
+button{width:100%;background:#1a1628;border:1px solid #5c4db1;border-radius:10px;padding:14px;color:#9b7cf6;font-size:15px;font-weight:600;cursor:pointer;font-family:'DM Mono',monospace}
+button:hover{background:#221a38}
+button:disabled{opacity:.5;cursor:default}
+.msg{margin-top:20px;padding:14px;border-radius:10px;font-size:14px;font-family:'DM Mono',monospace}
+.msg.ok{background:#1a3325;border:1px solid #2a4e38;color:#4caf76}
+.msg.err{background:#2d1515;border:1px solid #5c2020;color:#e05c5c}
+.msg.warn{background:#1f1509;border:1px solid #3d2a08;color:#c9883a}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="emoji" id="emoji">🥁</div>
+  <div class="tipo-label" id="tipo-label">carregando...</div>
+  <h1 id="titulo">—</h1>
+  <div class="data" id="data-label">—</div>
+  <input id="nome" type="text" placeholder="Seu nome completo" maxlength="100" autocomplete="name"/>
+  <button id="btn" onclick="confirmar()">Confirmar presença</button>
+  <div id="msg" style="display:none"></div>
+</div>
+<script>
+const tipo = "{{ tipo }}";
+const hoje = new Date();
+const diasSemana = ["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
+const meses = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+const dataFmt = `${diasSemana[hoje.getDay()]}, ${hoje.getDate()} ${meses[hoje.getMonth()]} ${hoje.getFullYear()}`;
+
+document.getElementById('emoji').textContent   = tipo==='treino' ? '🥁' : '🎌';
+document.getElementById('tipo-label').textContent = tipo==='treino' ? 'Treino em Conjunto' : 'Apresentação';
+document.getElementById('titulo').textContent  = tipo==='treino' ? 'Treino em Conjunto' : 'Apresentação';
+document.getElementById('data-label').textContent = dataFmt;
+
+document.getElementById('nome').addEventListener('keydown', e => { if(e.key==='Enter') confirmar(); });
+
+async function confirmar(){
+  const nome = document.getElementById('nome').value.trim();
+  if(!nome){ showMsg('Por favor, informe seu nome.','err'); return; }
+  const btn = document.getElementById('btn');
+  btn.disabled = true; btn.textContent = 'Registrando...';
+  try{
+    const r = await fetch('/api/checkin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tipo,nome})});
+    const d = await r.json();
+    if(d.ok){
+      const jaExistia = d.msg.includes('já registrada');
+      showMsg(jaExistia ? `⚠️ ${nome}, sua presença já estava registrada!` : `✓ Presença confirmada, ${nome}!`, jaExistia?'warn':'ok');
+      document.getElementById('nome').value='';
+      document.getElementById('nome').disabled=true;
+      btn.style.display='none';
+    } else {
+      showMsg('Erro ao registrar. Tente novamente.','err');
+      btn.disabled=false; btn.textContent='Confirmar presença';
+    }
+  }catch(e){
+    showMsg('Erro de conexão. Tente novamente.','err');
+    btn.disabled=false; btn.textContent='Confirmar presença';
+  }
+}
+
+function showMsg(text, type){
+  const el = document.getElementById('msg');
+  el.className='msg '+type; el.textContent=text; el.style.display='block';
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Scout — Sankyu</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Serif:wght@400;600&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Serif',serif;background:#0e0e0f;color:#e8e4d8;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.box{background:#111113;border:1px solid #2a2a2e;border-radius:16px;padding:40px;width:360px;text-align:center}
+.logo{font-size:32px;margin-bottom:8px}
+h1{font-size:20px;font-weight:600;color:#e8e4d8;margin-bottom:4px}
+.sub{font-size:12px;color:#555;font-family:'DM Mono',monospace;letter-spacing:.1em;margin-bottom:32px}
+input{width:100%;background:#1a1a1d;border:1px solid #2a2a2e;border-radius:8px;padding:10px 14px;font-size:14px;color:#e8e4d8;outline:none;font-family:inherit;text-align:center;letter-spacing:.05em}
+input:focus{border-color:#5c4db1}
+.err{font-size:12px;color:#e05c5c;margin:8px 0 0;font-family:'DM Mono',monospace}
+button{margin-top:16px;width:100%;background:#1a1628;border:1px solid #5c4db1;border-radius:8px;padding:11px;color:#9b7cf6;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Mono',monospace}
+button:hover{background:#221a38}
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="logo">🎵</div>
+  <h1>Scout — Sankyu</h1>
+  <div class="sub">Área restrita</div>
+  <form method="POST" action="/scout/login">
+    <input type="password" name="senha" placeholder="Digite a senha" autofocus/>
+    {% if erro %}<div class="err">Senha incorreta. Tente novamente.</div>{% endif %}
+    <button type="submit">Entrar</button>
+  </form>
+</div>
+</body>
+</html>

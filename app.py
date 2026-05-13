@@ -120,6 +120,7 @@ class Video(db.Model):
 # ── Rotas ─────────────────────────────────────────────────────────────────────
 
 @app.route("/")
+@app.route("/producao")
 def index():
     return render_template("index.html")
 
@@ -236,6 +237,442 @@ def stats():
         "pubData": v.pub_data, "pubPlataformas": v.pub_plataformas,
     } for v in videos])
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MÓDULO SCOUT
+# ═══════════════════════════════════════════════════════════════════════════════
+
+SCOUT_SENHA = os.environ.get("SCOUT_SENHA", "S@nkyu2018")
+
+INSTRUMENTOS_PADRAO = ["Shamisen","Taiko","Shinobue","Shakuhachi","Koto","Canto Minyo"]
+
+MUSICAS_PADRAO = [
+    "Soran Bushi","Tsugaru Jinku","Hanagasa Ondo","Tokyo Ondo","Hokkai Bon Uta",
+    "Kuroda Bushi","Tanko Bushi","Kokiriko Bushi","Setsugekka","Nada no Sakazuri Iwai Uta",
+    "Rokudan","Kyu Bushi","Shikisai 1.8","Saitaro Bushi","Sanpo","Binks no Sake",
+    "Itsudemo Dareka Ga","Akita Ondo","Souma Bon Uta","Hobashira Okoshi Ondo","Otemoyan",
+    "Donpan Bushi","Nambu Tawaratsumi","Aizu Baidasan","Shan shan uma douchuu",
+    "Chakkiri Bushi","Owase Bushi","Mogamigawa","Tanto Bushi","Asa Branca","Anunciação",
+    "Awa Odori","Kachou Fuugetsu","Hitohira","Senbonzakura","Sansa Odori",
+    "Sanshin no Hana","Shimanchuu no Takara","Funakogi Nagashi uta","Shunpu",
+]
+
+NIVEIS = {0:"Ainda não sei",1:"Iniciante",2:"Em evolução",
+          3:"Com acompanhamento",4:"Toca sozinho",5:"Proficiente"}
+
+# ── Modelos Scout ──────────────────────────────────────────────────────────────
+
+class Instrumento(db.Model):
+    __tablename__ = "scout_instrumentos"
+    id   = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    nome = db.Column(db.String(100), nullable=False, unique=True)
+    def to_dict(self): return {"id":self.id,"nome":self.nome}
+
+class Musica(db.Model):
+    __tablename__ = "scout_musicas"
+    id   = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    nome = db.Column(db.String(200), nullable=False, unique=True)
+    def to_dict(self): return {"id":self.id,"nome":self.nome}
+
+class Aluno(db.Model):
+    __tablename__ = "scout_alunos"
+    id         = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    nome       = db.Column(db.String(150), nullable=False)
+    contato    = db.Column(db.String(200), default="")
+    obs        = db.Column(db.Text, default="")
+    criado_em  = db.Column(db.DateTime, default=datetime.utcnow)
+    fichas     = db.relationship("FichaAluno", backref="aluno", cascade="all,delete-orphan")
+
+    def to_dict(self):
+        return {"id":self.id,"nome":self.nome,"contato":self.contato,
+                "obs":self.obs,"criadoEm":self.criado_em.isoformat() if self.criado_em else None}
+
+class FichaAluno(db.Model):
+    __tablename__ = "scout_fichas"
+    id            = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    aluno_id      = db.Column(db.Integer, db.ForeignKey("scout_alunos.id"), nullable=False)
+    instrumento_id= db.Column(db.Integer, db.ForeignKey("scout_instrumentos.id"), nullable=False)
+    musica_id     = db.Column(db.Integer, db.ForeignKey("scout_musicas.id"), nullable=False)
+    nivel         = db.Column(db.Integer, default=0)  # 0-5
+    obs           = db.Column(db.String(300), default="")
+    atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    instrumento = db.relationship("Instrumento")
+    musica      = db.relationship("Musica")
+
+    def to_dict(self):
+        return {"id":self.id,"alunoId":self.aluno_id,
+                "instrumento":self.instrumento.to_dict() if self.instrumento else None,
+                "musica":self.musica.to_dict() if self.musica else None,
+                "nivel":self.nivel,"nivelLabel":NIVEIS.get(self.nivel,"—"),
+                "obs":self.obs,
+                "atualizadoEm":self.atualizado_em.isoformat() if self.atualizado_em else None}
+
+class Evento(db.Model):
+    __tablename__ = "scout_eventos"
+    id        = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    tipo      = db.Column(db.String(20), nullable=False)  # 'treino' | 'apresentacao'
+    titulo    = db.Column(db.String(200), nullable=False)
+    data      = db.Column(db.Date, nullable=False, default=datetime.utcnow)
+    obs       = db.Column(db.Text, default="")
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    presencas = db.relationship("Presenca", backref="evento", cascade="all,delete-orphan")
+
+    def to_dict(self):
+        return {"id":self.id,"tipo":self.tipo,"titulo":self.titulo,
+                "data":self.data.isoformat() if self.data else None,
+                "obs":self.obs,"totalPresencas":len(self.presencas),
+                "criadoEm":self.criado_em.isoformat() if self.criado_em else None}
+
+class Presenca(db.Model):
+    __tablename__ = "scout_presencas"
+    id        = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    evento_id = db.Column(db.Integer, db.ForeignKey("scout_eventos.id"), nullable=False)
+    nome      = db.Column(db.String(150), nullable=False)
+    aluno_id  = db.Column(db.Integer, db.ForeignKey("scout_alunos.id"), nullable=True)
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+
+    aluno = db.relationship("Aluno")
+
+    def to_dict(self):
+        return {"id":self.id,"eventoId":self.evento_id,"nome":self.nome,
+                "alunoId":self.aluno_id,
+                "alunoNome":self.aluno.nome if self.aluno else None,
+                "criadoEm":self.criado_em.isoformat() if self.criado_em else None}
+
+
+# ── Rotas Scout — páginas ──────────────────────────────────────────────────────
+
+@app.route("/scout")
+def scout_index():
+    senha = request.args.get("senha","")
+    if senha != SCOUT_SENHA:
+        return render_template("scout_login.html")
+    return render_template("scout.html", senha=SCOUT_SENHA)
+
+@app.route("/scout/login", methods=["POST"])
+def scout_login():
+    from flask import redirect, url_for
+    senha = request.form.get("senha","")
+    if senha == SCOUT_SENHA:
+        return redirect(f"/scout?senha={SCOUT_SENHA}")
+    return render_template("scout_login.html", erro=True)
+
+@app.route("/cadastro")
+def cadastro_index():
+    return render_template("scout_cadastro.html")
+
+@app.route("/checkin/<tipo>")
+def checkin_page(tipo):
+    if tipo not in ("treino","apresentacao"):
+        return "Página não encontrada", 404
+    return render_template("scout_checkin.html", tipo=tipo)
+
+
+# ── Rotas Scout — API instrumentos ────────────────────────────────────────────
+
+@app.route("/api/scout/instrumentos")
+def scout_list_instrumentos():
+    return jsonify([i.to_dict() for i in Instrumento.query.order_by(Instrumento.nome).all()])
+
+@app.route("/api/scout/instrumentos", methods=["POST"])
+def scout_create_instrumento():
+    nome = request.json.get("nome","").strip()
+    if not nome: return jsonify({"error":"Nome obrigatório"}),400
+    if Instrumento.query.filter_by(nome=nome).first(): return jsonify({"error":"Já existe"}),409
+    i = Instrumento(nome=nome); db.session.add(i); db.session.commit()
+    return jsonify(i.to_dict()),201
+
+@app.route("/api/scout/instrumentos/<int:iid>", methods=["PUT"])
+def scout_update_instrumento(iid):
+    i = Instrumento.query.get_or_404(iid)
+    i.nome = request.json.get("nome",i.nome).strip()
+    db.session.commit(); return jsonify(i.to_dict())
+
+@app.route("/api/scout/instrumentos/<int:iid>", methods=["DELETE"])
+def scout_delete_instrumento(iid):
+    i = Instrumento.query.get_or_404(iid); db.session.delete(i)
+    db.session.commit(); return jsonify({"ok":True})
+
+
+# ── Rotas Scout — API músicas ──────────────────────────────────────────────────
+
+@app.route("/api/scout/musicas")
+def scout_list_musicas():
+    return jsonify([m.to_dict() for m in Musica.query.order_by(Musica.nome).all()])
+
+@app.route("/api/scout/musicas", methods=["POST"])
+def scout_create_musica():
+    nome = request.json.get("nome","").strip()
+    if not nome: return jsonify({"error":"Nome obrigatório"}),400
+    if Musica.query.filter_by(nome=nome).first(): return jsonify({"error":"Já existe"}),409
+    m = Musica(nome=nome); db.session.add(m); db.session.commit()
+    return jsonify(m.to_dict()),201
+
+@app.route("/api/scout/musicas/<int:mid>", methods=["PUT"])
+def scout_update_musica(mid):
+    m = Musica.query.get_or_404(mid)
+    m.nome = request.json.get("nome",m.nome).strip()
+    db.session.commit(); return jsonify(m.to_dict())
+
+@app.route("/api/scout/musicas/<int:mid>", methods=["DELETE"])
+def scout_delete_musica(mid):
+    m = Musica.query.get_or_404(mid); db.session.delete(m)
+    db.session.commit(); return jsonify({"ok":True})
+
+
+# ── Rotas Scout — API alunos ──────────────────────────────────────────────────
+
+@app.route("/api/scout/alunos")
+def scout_list_alunos():
+    alunos = Aluno.query.order_by(Aluno.nome).all()
+    return jsonify([a.to_dict() for a in alunos])
+
+@app.route("/api/scout/alunos", methods=["POST"])
+def scout_create_aluno():
+    data = request.json
+    nome = data.get("nome","").strip()
+    if not nome: return jsonify({"error":"Nome obrigatório"}),400
+    a = Aluno(nome=nome, contato=data.get("contato",""), obs=data.get("obs",""))
+    db.session.add(a); db.session.commit()
+    return jsonify(a.to_dict()),201
+
+@app.route("/api/scout/alunos/<int:aid>", methods=["PUT"])
+def scout_update_aluno(aid):
+    a = Aluno.query.get_or_404(aid); data = request.json
+    if "nome" in data: a.nome = data["nome"].strip()
+    if "contato" in data: a.contato = data["contato"]
+    if "obs" in data: a.obs = data["obs"]
+    db.session.commit(); return jsonify(a.to_dict())
+
+@app.route("/api/scout/alunos/<int:aid>", methods=["DELETE"])
+def scout_delete_aluno(aid):
+    a = Aluno.query.get_or_404(aid); db.session.delete(a)
+    db.session.commit(); return jsonify({"ok":True})
+
+@app.route("/api/scout/alunos/<int:aid>/fichas")
+def scout_aluno_fichas(aid):
+    fichas = FichaAluno.query.filter_by(aluno_id=aid).all()
+    return jsonify([f.to_dict() for f in fichas])
+
+
+# ── Rotas Scout — API fichas ──────────────────────────────────────────────────
+
+@app.route("/api/scout/fichas", methods=["POST"])
+def scout_create_ficha():
+    data = request.json
+    # upsert: se já existe aluno+instrumento+musica, atualiza o nível
+    existing = FichaAluno.query.filter_by(
+        aluno_id=data["aluno_id"],
+        instrumento_id=data["instrumento_id"],
+        musica_id=data["musica_id"]
+    ).first()
+    if existing:
+        existing.nivel = int(data.get("nivel",0))
+        existing.obs   = data.get("obs","")
+        existing.atualizado_em = datetime.utcnow()
+        db.session.commit(); return jsonify(existing.to_dict())
+    f = FichaAluno(aluno_id=data["aluno_id"], instrumento_id=data["instrumento_id"],
+                   musica_id=data["musica_id"], nivel=int(data.get("nivel",0)),
+                   obs=data.get("obs",""))
+    db.session.add(f); db.session.commit()
+    return jsonify(f.to_dict()),201
+
+@app.route("/api/scout/fichas/<int:fid>", methods=["PUT"])
+def scout_update_ficha(fid):
+    f = FichaAluno.query.get_or_404(fid); data = request.json
+    if "nivel" in data: f.nivel = int(data["nivel"])
+    if "obs" in data: f.obs = data["obs"]
+    f.atualizado_em = datetime.utcnow()
+    db.session.commit(); return jsonify(f.to_dict())
+
+@app.route("/api/scout/fichas/<int:fid>", methods=["DELETE"])
+def scout_delete_ficha(fid):
+    f = FichaAluno.query.get_or_404(fid); db.session.delete(f)
+    db.session.commit(); return jsonify({"ok":True})
+
+@app.route("/api/scout/fichas/bulk", methods=["POST"])
+def scout_bulk_fichas():
+    """Salva múltiplas fichas de uma vez (usado no formulário de cadastro)."""
+    items = request.json.get("fichas",[])
+    results = []
+    for item in items:
+        existing = FichaAluno.query.filter_by(
+            aluno_id=item["aluno_id"], instrumento_id=item["instrumento_id"],
+            musica_id=item["musica_id"]).first()
+        if existing:
+            existing.nivel = int(item.get("nivel",0)); existing.obs = item.get("obs","")
+            existing.atualizado_em = datetime.utcnow(); results.append(existing.to_dict())
+        else:
+            f = FichaAluno(aluno_id=item["aluno_id"], instrumento_id=item["instrumento_id"],
+                           musica_id=item["musica_id"], nivel=int(item.get("nivel",0)),
+                           obs=item.get("obs",""))
+            db.session.add(f); db.session.flush(); results.append(f.to_dict())
+    db.session.commit()
+    return jsonify(results),201
+
+
+# ── Rotas Scout — API eventos ──────────────────────────────────────────────────
+
+@app.route("/api/scout/eventos")
+def scout_list_eventos():
+    evts = Evento.query.order_by(Evento.data.desc()).all()
+    return jsonify([e.to_dict() for e in evts])
+
+@app.route("/api/scout/eventos/<int:eid>")
+def scout_get_evento(eid):
+    e = Evento.query.get_or_404(eid)
+    d = e.to_dict()
+    d["presencas"] = [p.to_dict() for p in e.presencas]
+    return jsonify(d)
+
+@app.route("/api/scout/eventos", methods=["POST"])
+def scout_create_evento():
+    data = request.json
+    e = Evento(tipo=data["tipo"], titulo=data["titulo"],
+               data=datetime.strptime(data["data"],"%Y-%m-%d").date(),
+               obs=data.get("obs",""))
+    db.session.add(e); db.session.commit(); return jsonify(e.to_dict()),201
+
+@app.route("/api/scout/eventos/<int:eid>", methods=["PUT"])
+def scout_update_evento(eid):
+    e = Evento.query.get_or_404(eid); data = request.json
+    if "titulo" in data: e.titulo = data["titulo"]
+    if "obs" in data: e.obs = data["obs"]
+    db.session.commit(); return jsonify(e.to_dict())
+
+@app.route("/api/scout/eventos/<int:eid>", methods=["DELETE"])
+def scout_delete_evento(eid):
+    e = Evento.query.get_or_404(eid); db.session.delete(e)
+    db.session.commit(); return jsonify({"ok":True})
+
+
+# ── Rotas Scout — API presenças ────────────────────────────────────────────────
+
+@app.route("/api/scout/presencas/<int:eid>")
+def scout_list_presencas(eid):
+    ps = Presenca.query.filter_by(evento_id=eid).order_by(Presenca.criado_em).all()
+    return jsonify([p.to_dict() for p in ps])
+
+@app.route("/api/scout/presencas/<int:pid>", methods=["DELETE"])
+def scout_delete_presenca(pid):
+    p = Presenca.query.get_or_404(pid); db.session.delete(p)
+    db.session.commit(); return jsonify({"ok":True})
+
+@app.route("/api/scout/eventos/<int:eid>/presencas", methods=["POST"])
+def scout_add_presenca_manual(eid):
+    evt = Evento.query.get_or_404(eid)
+    nome = request.json.get("nome","").strip()
+    if not nome:
+        return jsonify({"error":"Nome obrigatório"}),400
+    # avoid duplicate
+    ja = Presenca.query.filter_by(evento_id=eid, nome=nome).first()
+    if ja:
+        return jsonify({"ok":True,"msg":"Presença já registrada","presenca":ja.to_dict()})
+    p = Presenca(evento_id=eid, nome=nome)
+    db.session.add(p); db.session.commit()
+    return jsonify({"ok":True,"presenca":p.to_dict()}),201
+
+@app.route("/api/scout/presencas/<int:pid>/vincular", methods=["POST"])
+def scout_vincular_presenca(pid):
+    p = Presenca.query.get_or_404(pid)
+    aluno_id = request.json.get("aluno_id")
+    if aluno_id:
+        Aluno.query.get_or_404(aluno_id)
+        p.aluno_id = aluno_id
+    else:
+        p.aluno_id = None
+    db.session.commit()
+    return jsonify(p.to_dict())
+
+
+# ── Rota pública — check-in via QR ────────────────────────────────────────────
+
+@app.route("/api/checkin", methods=["POST"])
+def checkin():
+    data  = request.json
+    tipo  = data.get("tipo")   # 'treino' | 'apresentacao'
+    nome  = data.get("nome","").strip()
+    if not nome or tipo not in ("treino","apresentacao"):
+        return jsonify({"error":"Dados inválidos"}),400
+
+    hoje  = datetime.utcnow().date()
+    tipo_label = "Treino em Conjunto" if tipo=="treino" else "Apresentação"
+    titulo = f"{tipo_label} — {hoje.strftime('%d/%m/%Y')}"
+
+    # cria o evento do dia se ainda não existe
+    evt = Evento.query.filter_by(tipo=tipo, data=hoje).first()
+    if not evt:
+        evt = Evento(tipo=tipo, titulo=titulo, data=hoje)
+        db.session.add(evt); db.session.flush()
+
+    # evita duplicata de nome no mesmo evento
+    ja = Presenca.query.filter_by(evento_id=evt.id, nome=nome).first()
+    if ja:
+        return jsonify({"ok":True,"msg":"Presença já registrada!","evento":evt.to_dict()})
+
+    p = Presenca(evento_id=evt.id, nome=nome)
+    db.session.add(p); db.session.commit()
+    return jsonify({"ok":True,"msg":"Presença confirmada!","evento":evt.to_dict()})
+
+
+# ── Rota pública — cadastro de aluno ──────────────────────────────────────────
+
+@app.route("/api/cadastro", methods=["POST"])
+def cadastro_aluno():
+    data   = request.json
+    nome   = data.get("nome","").strip()
+    if not nome: return jsonify({"error":"Nome obrigatório"}),400
+    contato = data.get("contato","")
+    a = Aluno(nome=nome, contato=contato)
+    db.session.add(a); db.session.flush()
+    fichas = data.get("fichas",[])
+    for item in fichas:
+        f = FichaAluno(aluno_id=a.id, instrumento_id=item["instrumento_id"],
+                       musica_id=item["musica_id"], nivel=int(item.get("nivel",0)))
+        db.session.add(f)
+    db.session.commit()
+    return jsonify({"ok":True,"alunoId":a.id}),201
+
+
+# ── Rota — gerar QR codes ─────────────────────────────────────────────────────
+
+@app.route("/api/scout/qrcode/<tipo>")
+def gerar_qrcode(tipo):
+    if tipo not in ("treino","apresentacao","cadastro"):
+        return jsonify({"error":"Tipo inválido"}),400
+    try:
+        import qrcode
+        base_url = request.host_url.rstrip("/")
+        url = f"{base_url}/checkin/{tipo}" if tipo != "cadastro" else f"{base_url}/cadastro"
+
+        qr = qrcode.QRCode(
+            version=None,
+            error_correction=qrcode.constants.ERROR_CORRECT_H,
+            box_size=8, border=3)
+        qr.add_data(url)
+        qr.make(fit=True)
+
+        # Build clean pixel-based SVG from matrix (no Pillow, no mm units)
+        matrix = qr.get_matrix()
+        box = 8
+        border = 3
+        dim = (len(matrix) + border * 2) * box
+        parts = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{dim}" height="{dim}" viewBox="0 0 {dim} {dim}">',
+                 f'<rect width="{dim}" height="{dim}" fill="white"/>']
+        for r, row in enumerate(matrix):
+            for c, val in enumerate(row):
+                if val:
+                    x = (c + border) * box
+                    y = (r + border) * box
+                    parts.append(f'<rect x="{x}" y="{y}" width="{box}" height="{box}" fill="black"/>')
+        parts.append('</svg>')
+        svg = ''.join(parts)
+        return jsonify({"url": url, "svg": svg})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 with app.app_context():
     db.create_all()
     if Professor.query.count() == 0:
@@ -247,6 +684,14 @@ with app.app_context():
         for tnome in ["Informativo","Chamada de evento","Chamada de aula experimental",
                      "Trecho de apresentação","Trecho de aula","Bastidores / treino"]:
             db.session.add(TipoProposito(nome=tnome))
+        db.session.commit()
+    if Instrumento.query.count() == 0:
+        for inome in INSTRUMENTOS_PADRAO:
+            db.session.add(Instrumento(nome=inome))
+        db.session.commit()
+    if Musica.query.count() == 0:
+        for mnome in MUSICAS_PADRAO:
+            db.session.add(Musica(nome=mnome))
         db.session.commit()
 
 if __name__ == "__main__":
