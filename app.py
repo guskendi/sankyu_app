@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.orm import joinedload
 from datetime import datetime
 import os, json
 
@@ -12,6 +13,13 @@ if DATABASE_URL.startswith("postgres://"):
 app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "sankyu-dev-secret")
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+    "pool_pre_ping": True,       # verifica conexão antes de usar
+    "pool_recycle": 280,         # recicla conexões a cada ~4.5 min (Neon fecha idle em 5min)
+    "pool_size": 3,              # máximo 3 conexões simultâneas (free tier tem limite)
+    "max_overflow": 2,           # até 2 conexões extras em pico
+    "connect_args": {"connect_timeout": 10} if not DATABASE_URL.startswith("sqlite") else {},
+}
 
 db = SQLAlchemy(app)
 
@@ -71,7 +79,7 @@ class Video(db.Model):
     publicado_em     = db.Column(db.DateTime, nullable=True)
     concluido_em     = db.Column(db.DateTime, nullable=True)
 
-    professor = db.relationship("Professor", backref="videos")
+    professor = db.relationship("Professor", backref="videos", lazy="joined")
 
     def _active_stages(self):
         s = []
@@ -180,7 +188,10 @@ def delete_tipo(tid):
 
 @app.route("/api/videos", methods=["GET"])
 def list_videos():
-    return jsonify([v.to_dict() for v in Video.query.order_by(Video.criado_em.desc()).all()])
+    videos = Video.query.options(
+        joinedload(Video.professor)
+    ).order_by(Video.criado_em.desc()).all()
+    return jsonify([v.to_dict() for v in videos])
 
 @app.route("/api/videos", methods=["POST"])
 def create_video():
@@ -297,8 +308,8 @@ class FichaAluno(db.Model):
     obs           = db.Column(db.String(300), default="")
     atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    instrumento = db.relationship("Instrumento")
-    musica      = db.relationship("Musica")
+    instrumento = db.relationship("Instrumento", lazy="joined")
+    musica      = db.relationship("Musica", lazy="joined")
 
     def to_dict(self):
         return {"id":self.id,"alunoId":self.aluno_id,
@@ -332,7 +343,7 @@ class Presenca(db.Model):
     aluno_id  = db.Column(db.Integer, db.ForeignKey("scout_alunos.id"), nullable=True)
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
 
-    aluno = db.relationship("Aluno")
+    aluno = db.relationship("Aluno", lazy="joined")
 
     def to_dict(self):
         return {"id":self.id,"eventoId":self.evento_id,"nome":self.nome,
@@ -452,7 +463,10 @@ def scout_delete_aluno(aid):
 
 @app.route("/api/scout/alunos/<int:aid>/fichas")
 def scout_aluno_fichas(aid):
-    fichas = FichaAluno.query.filter_by(aluno_id=aid).all()
+    fichas = FichaAluno.query.options(
+        joinedload(FichaAluno.instrumento),
+        joinedload(FichaAluno.musica)
+    ).filter_by(aluno_id=aid).all()
     return jsonify([f.to_dict() for f in fichas])
 
 
@@ -516,13 +530,34 @@ def scout_bulk_fichas():
 
 @app.route("/api/scout/eventos")
 def scout_list_eventos():
-    evts = Evento.query.order_by(Evento.data.desc()).all()
-    return jsonify([e.to_dict() for e in evts])
+    from sqlalchemy import func
+    # Use a subquery to count presencas without loading them all
+    presenca_count = db.session.query(
+        Presenca.evento_id,
+        func.count(Presenca.id).label("total")
+    ).group_by(Presenca.evento_id).subquery()
+
+    evts = db.session.query(Evento).order_by(Evento.data.desc()).all()
+    counts = {row.evento_id: row.total for row in db.session.query(presenca_count).all()}
+
+    result = []
+    for e in evts:
+        d = {"id":e.id,"tipo":e.tipo,"titulo":e.titulo,
+             "data":e.data.isoformat() if e.data else None,
+             "obs":e.obs,"totalPresencas":counts.get(e.id,0),
+             "criadoEm":e.criado_em.isoformat() if e.criado_em else None}
+        result.append(d)
+    return jsonify(result)
 
 @app.route("/api/scout/eventos/<int:eid>")
 def scout_get_evento(eid):
-    e = Evento.query.get_or_404(eid)
-    d = e.to_dict()
+    e = Evento.query.options(
+        joinedload(Evento.presencas).joinedload(Presenca.aluno)
+    ).get_or_404(eid)
+    d = {"id":e.id,"tipo":e.tipo,"titulo":e.titulo,
+         "data":e.data.isoformat() if e.data else None,
+         "obs":e.obs,"totalPresencas":len(e.presencas),
+         "criadoEm":e.criado_em.isoformat() if e.criado_em else None}
     d["presencas"] = [p.to_dict() for p in e.presencas]
     return jsonify(d)
 
