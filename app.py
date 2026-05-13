@@ -458,8 +458,12 @@ def scout_update_aluno(aid):
 
 @app.route("/api/scout/alunos/<int:aid>", methods=["DELETE"])
 def scout_delete_aluno(aid):
-    a = Aluno.query.get_or_404(aid); db.session.delete(a)
-    db.session.commit(); return jsonify({"ok":True})
+    a = Aluno.query.get_or_404(aid)
+    # Clear any presenca links before deleting (presencas stay, just lose the link)
+    Presenca.query.filter_by(aluno_id=aid).update({"aluno_id": None})
+    db.session.delete(a)
+    db.session.commit()
+    return jsonify({"ok": True})
 
 @app.route("/api/scout/alunos/<int:aid>/fichas")
 def scout_aluno_fichas(aid):

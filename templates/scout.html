@@ -265,8 +265,7 @@ function renderAlunos(){
             <td style="font-weight:600;color:#e0ddd5">${a.nome}</td>
             <td style="color:#777">${a.contato||'—'}</td>
             <td style="color:#555;font-family:'DM Mono',monospace;font-size:11px">${fmtDate(a.criadoEm)}</td>
-            <td onclick="event.stopPropagation()" style="display:flex;gap:5px">
-              <button class="btn-xs" onclick="openEditAluno(${a.id})">Editar</button>
+            <td onclick="event.stopPropagation()">
               <button class="btn-xs del" onclick="delAluno(${a.id})">Excluir</button>
             </td>
           </tr>`).join('')}
@@ -387,9 +386,18 @@ async function submitAluno(){
 
 async function delAluno(id){
   const a=alunos.find(x=>x.id===id);
-  if(!confirm(`Excluir "${a.nome}" e todas as suas fichas?`)) return;
+  // Check if this aluno is linked to any presenca
+  const vinculados=eventos.reduce((acc,e)=>{
+    // we don't have presencas in memory per evento, so just warn and let backend decide
+    return acc;
+  },[]);
+  if(!confirm(`Excluir "${a.nome}" e todas as suas fichas?\n\nSe este aluno estiver vinculado a alguma presença, o vínculo será removido mas a presença permanecerá.`)) return;
   sav(true);
-  await api(`/api/scout/alunos/${id}`,'DELETE');
+  const r=await api(`/api/scout/alunos/${id}`,'DELETE');
+  if(r && r.error){
+    alert('Não foi possível excluir: '+r.error);
+    sav(false); return;
+  }
   alunos=alunos.filter(x=>x.id!==id);
   renderAll(); sav(false);
 }
@@ -658,7 +666,6 @@ async function openEvento(id){
         ? `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
             <span style="font-size:13px;color:#9b7cf6;cursor:pointer;text-decoration:underline;text-underline-offset:3px"
               onclick="closeModal('m-evento');openFicha(${match.id})" title="Abrir ficha de ${match.nome}">${p.nome} ↗</span>
-            <button class="btn-xs" style="font-size:10px;padding:2px 8px" onclick="openVincular(${p.id},${id},'${nomeEsc}')">trocar</button>
            </div>`
         : `<span style="font-size:13px;color:#c9883a;cursor:pointer;text-decoration:underline;text-underline-offset:3px;text-decoration-style:dashed"
             onclick="openVincular(${p.id},${id},'${nomeEsc}')" title="Clique para identificar este aluno">${p.nome}
