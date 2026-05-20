@@ -72,11 +72,7 @@ label{cursor:pointer}
 .cal-more{font-size:10px;color:#8b7cf6;font-family:'DM Mono',monospace;cursor:pointer;padding:2px 6px;background:#1a1628;border-radius:6px;border:1px solid #2a2a2e;display:inline-block;margin-top:2px}
 .cal-more:hover{border-color:#5c4db1}
 /* tooltip */
-.cal-tooltip{position:fixed;background:#18181b;border:1px solid #2a2a2e;border-radius:10px;padding:12px 14px;z-index:999;width:320px;max-height:70vh;overflow-y:scroll;pointer-events:auto;box-shadow:0 8px 24px rgba(0,0,0,.5);cursor:default}
-.cal-tooltip::-webkit-scrollbar{width:6px}
-.cal-tooltip::-webkit-scrollbar-track{background:#111}
-.cal-tooltip::-webkit-scrollbar-thumb{background:#444;border-radius:3px}
-.cal-tooltip::-webkit-scrollbar-thumb:hover{background:#666}
+.cal-tooltip{position:fixed;background:#18181b;border:1px solid #2a2a2e;border-radius:10px;padding:12px 14px;z-index:999;max-width:300px;max-height:400px;overflow-y:auto;pointer-events:auto;box-shadow:0 8px 24px rgba(0,0,0,.5);cursor:default}
 .cal-tooltip-title{font-size:11px;color:#555;font-family:'DM Mono',monospace;margin-bottom:8px;letter-spacing:.08em}
 .cal-tooltip-item{font-size:12px;color:#e0ddd5;padding:3px 0;border-bottom:1px solid #1e1e22;display:flex;align-items:center;gap:6px}
 .cal-tooltip-item:last-child{border-bottom:none}
@@ -495,13 +491,10 @@ function _calOutsideClick(){
 }
 
 function _calPositionTooltip(event, tooltip){
-  const margin=16;
-  const tipW=320;
-  const tipH=Math.min(window.innerHeight*0.7, 600);
-  const x=Math.min(event.clientX+14, window.innerWidth-tipW-margin);
-  const y=Math.min(event.clientY+14, window.innerHeight-tipH-margin);
-  tooltip.style.left=Math.max(margin,x)+'px';
-  tooltip.style.top=Math.max(margin,y)+'px';
+  const x=Math.min(event.clientX+14, window.innerWidth-320);
+  const y=Math.min(event.clientY+14, window.innerHeight-220);
+  tooltip.style.left=x+'px';
+  tooltip.style.top=y+'px';
 }
 
 function _calBuildTooltip(dateKey, showAll=false){
