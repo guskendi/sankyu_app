@@ -92,7 +92,111 @@ button{font-family:inherit;cursor:pointer}
 .presenca-item{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-bottom:1px solid #17171a}
 .presenca-item:last-child{border-bottom:none}
 
-/* qr section */
+/* ── Mobile responsive ──────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* wrap & header */
+  #wrap{padding:0 0 80px 0}
+  .hdr{padding:10px 14px;position:sticky;top:0;z-index:50}
+  .hdr-logo{height:28px}
+  .hdr-text .sub{font-size:9px;letter-spacing:.12em}
+  .hdr-text .title{font-size:14px}
+  .saving{display:none!important}
+  .btn-p{padding:8px 12px;font-size:12px}
+
+  /* bottom navigation instead of top tabs */
+  .tabs{
+    position:fixed;bottom:0;left:0;right:0;
+    background:#0e0e0f;border-top:1px solid #1e1e20;border-bottom:none;
+    display:flex;justify-content:space-around;
+    padding:0;z-index:100;
+    box-shadow:0 -4px 20px rgba(0,0,0,.5)
+  }
+  .tab{
+    flex:1;padding:10px 4px 8px;font-size:9px;letter-spacing:0;
+    display:flex;flex-direction:column;align-items:center;gap:2px;
+    border-bottom:none;border-top:2px solid transparent
+  }
+  .tab.active{border-bottom:none;border-top-color:#8b7cf6}
+  .tab::before{font-size:18px;line-height:1}
+  .tab[onclick*="alunos"]::before{content:"👥"}
+  .tab[onclick*="eventos"]::before{content:"📅"}
+  .tab[onclick*="musicas"]::before{content:"🎵"}
+  .tab[onclick*="instrumentos"]::before{content:"🎸"}
+  .tab[onclick*="qrcodes"]::before{content:"📱"}
+
+  /* panes */
+  .pane{padding:12px 14px}
+
+  /* filter row */
+  .filter-row{flex-direction:column;align-items:stretch;gap:6px}
+  .filter-row input,.filter-row select{width:100%;font-size:14px;padding:10px 12px}
+  .filter-row label{font-size:12px}
+
+  /* tables → cards */
+  .tbl-wrap{border-radius:0;border-left:none;border-right:none}
+  .stbl thead{display:none}
+  .stbl tr{display:flex;flex-direction:column;padding:12px 14px;border-bottom:1px solid #1e1e22;cursor:pointer}
+  .stbl tr:last-child{border-bottom:none}
+  .stbl td{padding:2px 0;border:none;font-size:13px}
+  .stbl td:first-child{font-weight:600;color:#e0ddd5;font-size:14px;margin-bottom:4px}
+  .stbl td:last-child{display:flex;gap:8px;margin-top:8px}
+  .stbl tr:hover td{background:transparent}
+
+  /* buttons */
+  .btn-xs{padding:6px 12px;font-size:12px}
+  .btn-ok,.btn-cancel{padding:12px;font-size:14px}
+  .btn-del2{padding:12px 16px;font-size:13px}
+
+  /* modals → full screen */
+  .overlay{align-items:flex-end;background:rgba(0,0,0,.6)}
+  .modal,.modal.wide,.modal.xl{
+    width:100%!important;max-height:92vh;
+    border-radius:20px 20px 0 0;
+    padding:20px 16px 24px;
+    border-left:none;border-right:none;border-bottom:none
+  }
+  .modal h3{font-size:16px;margin-bottom:14px}
+  .fg{margin-bottom:14px}
+  .fl{font-size:11px;margin-bottom:6px}
+  input,select,textarea{font-size:16px;padding:12px 14px} /* prevent zoom on iOS */
+  .mactions{flex-direction:column-reverse;gap:8px}
+  .btn-ok,.btn-cancel,.btn-del2{flex:none!important;width:100%;padding:14px;font-size:15px;border-radius:10px}
+
+  /* ficha aluno */
+  .musica-row{flex-wrap:wrap;gap:4px;padding:8px 0}
+  .musica-nome-sm{flex:none;width:100%;font-size:13px;font-weight:500;color:#e0ddd5}
+  .nivel-select{width:100%;font-size:14px;padding:8px 10px}
+
+  /* presencas */
+  .presenca-item{flex-wrap:wrap;gap:6px;padding:12px 14px}
+  .presenca-item > span:first-child{font-size:14px;flex:1;min-width:0}
+
+  /* eventos table */
+  .evt-tipo{font-size:11px;padding:3px 9px}
+
+  /* instrumento ficha grid */
+  [style*="grid-template-columns:repeat(2,1fr)"]{grid-template-columns:1fr!important}
+
+  /* qr cards */
+  .qr-cards{grid-template-columns:1fr!important;gap:12px}
+  .qr-svg{width:200px;height:200px}
+
+  /* instrumento checkbox grid in new aluno modal */
+  #fa-instr-grid{gap:6px}
+  #fa-instr-grid label{width:calc(50% - 3px)!important;justify-content:center}
+
+  /* ficha repertorio table in modal */
+  [style*="max-height:60vh"]{max-height:50vh!important}
+  [style*="max-height:280px"]{max-height:none!important}
+  [style*="max-height:260px"]{max-height:none!important}
+
+  /* vincular modal suggestions */
+  #m-vincular-body{font-size:13px}
+
+  /* padmin rows */
+  .padmin-row{flex-wrap:wrap;gap:8px;padding:12px 14px}
+  .padmin-nome,.padmin-instr{flex:none;width:100%}
+}
 .qr-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
 .qr-card{background:#111113;border:1px solid #1e1e22;border-radius:12px;padding:20px;text-align:center}
 .qr-card h3{font-size:14px;font-weight:600;margin-bottom:4px}
