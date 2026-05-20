@@ -466,7 +466,7 @@ async function vincularEAbrir(presencaId, alunoId, eventoId){
     const upd=await api(`/api/scout/eventos/${eventoId}`);
     eventos[evtIdx]=upd;
   }
-  openFicha(alunoId);
+  openFicha(alunoId, true); // filtrado: só instrumentos do aluno
 }
 
 // ── Ficha do aluno ────────────────────────────────────────────────────────────
@@ -474,7 +474,7 @@ async function vincularEAbrir(presencaId, alunoId, eventoId){
 // estado original da ficha aberta — para diff
 let fichaOriginal={};
 
-async function openFicha(aid){
+async function openFicha(aid, filtrado=false){
   const a=alunos.find(x=>x.id===aid);
   const fichas=await api(`/api/scout/alunos/${aid}/fichas`);
 
@@ -493,9 +493,22 @@ async function openFicha(aid){
     fichaOriginal[key]=f.nivel;
   });
 
+  // Se filtrado=true, mostra só instrumentos que o aluno já tem ficha
+  // Se filtrado=false (aba Alunos), mostra todos os instrumentos
+  const instrParaMostrar = filtrado
+    ? instrumentos.filter(i => byInstr[String(i.id)])
+    : instrumentos;
+
+  const semInstrMsg = filtrado && instrParaMostrar.length===0
+    ? `<div style="padding:20px;text-align:center;color:#555;font-style:italic;font-size:13px">
+        Nenhum instrumento cadastrado para este aluno.<br>
+        <span style="font-size:11px">Abra a ficha na aba Alunos para adicionar instrumentos.</span>
+       </div>`
+    : '';
+
   // build instrumento blocks
   let instrBlocks='';
-  instrumentos.forEach(instr=>{
+  instrParaMostrar.forEach(instr=>{
     const group=byInstr[String(instr.id)];
     const rows=musicas.map(m=>{
       const ficha=group?.fichas.find(f=>String(f.musica.id)===String(m.id));
@@ -513,19 +526,25 @@ async function openFicha(aid){
     </div>`;
   });
 
+  const subTitle = filtrado
+    ? `<span style="font-size:10px;color:#5bafd6;font-family:'DM Mono',monospace;padding:2px 8px;background:#1a2535;border-radius:6px;border:1px solid #1e3a50">só instrumentos do aluno</span>`
+    : '';
+
   document.getElementById('m-ficha-body').innerHTML=`
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
-      <div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <h3 style="margin:0">${a.nome}</h3>
+        ${subTitle}
       </div>
       <span style="font-size:10px;color:#555;font-family:'DM Mono',monospace" id="ficha-hint">Clique em Salvar ficha para confirmar alterações</span>
     </div>
+    ${semInstrMsg}
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;max-height:60vh;overflow-y:auto">
       ${instrBlocks}
     </div>
     <div class="mactions">
       <button class="btn-cancel" onclick="closeModal('m-ficha')">Fechar</button>
-      <button class="btn-ok" id="btn-salvar-ficha" onclick="salvarFicha(${aid})">Salvar ficha</button>
+      ${instrParaMostrar.length>0?`<button class="btn-ok" id="btn-salvar-ficha" onclick="salvarFicha(${aid})">Salvar ficha</button>`:''}
     </div>`;
 
   // highlight selects when changed
@@ -652,7 +671,7 @@ async function openEvento(id){
       const nomeHtml=match
         ? `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
             <span style="font-size:13px;color:#9b7cf6;cursor:pointer;text-decoration:underline;text-underline-offset:3px"
-              onclick="closeModal('m-evento');openFicha(${match.id})" title="Abrir ficha de ${match.nome}">${p.nome} ↗</span>
+              onclick="closeModal('m-evento');openFicha(${match.id},true)" title="Abrir ficha de ${match.nome}">${p.nome} ↗</span>
            </div>`
         : `<span style="font-size:13px;color:#c9883a;cursor:pointer;text-decoration:underline;text-underline-offset:3px;text-decoration-style:dashed"
             onclick="openVincular(${p.id},${id},'${nomeEsc}')" title="Clique para identificar este aluno">${p.nome}
