@@ -57,7 +57,7 @@ label{cursor:pointer}
 .cal-nav-btn:hover{border-color:#555;color:#ccc}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
 .cal-dow{text-align:center;font-size:10px;color:#555;font-family:'DM Mono',monospace;padding:4px 0;letter-spacing:.08em}
-.cal-day{background:#111113;border:1px solid #1e1e22;border-radius:8px;padding:6px;height:90px;overflow:hidden;position:relative;cursor:default;transition:border-color .15s}
+.cal-day{background:#111113;border:1px solid #1e1e22;border-radius:8px;padding:6px 6px 22px 6px;height:110px;overflow:hidden;position:relative;cursor:default;transition:border-color .15s}
 .cal-day:hover{border-color:#333}
 .cal-day.today{border-color:#5c4db1}
 .cal-day.empty{background:transparent;border-color:transparent}
@@ -69,7 +69,7 @@ label{cursor:pointer}
 .cal-dot-gravacao{background:#1a2e3d;color:#5bafd6}
 .cal-dot-edicao{background:#2d1f0a;color:#c9883a}
 .cal-dot-publicacao{background:#1a3325;color:#4caf76}
-.cal-more{font-size:10px;color:#8b7cf6;font-family:'DM Mono',monospace;cursor:pointer;padding:2px 6px;background:#1a1628;border-radius:6px;border:1px solid #2a2a2e;display:inline-block;margin-top:2px}
+.cal-more{font-size:10px;color:#8b7cf6;font-family:'DM Mono',monospace;cursor:pointer;padding:2px 6px;background:#1a1628;border-radius:6px;border:1px solid #2a2a2e;position:absolute;bottom:4px;left:6px}
 .cal-more:hover{border-color:#5c4db1}
 /* tooltip */
 .cal-tooltip{position:fixed;background:#18181b;border:1px solid #2a2a2e;border-radius:10px;padding:12px 14px;z-index:999;width:320px;max-height:70vh;overflow-y:scroll;pointer-events:auto;box-shadow:0 8px 24px rgba(0,0,0,.5);cursor:default}
