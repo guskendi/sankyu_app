@@ -65,6 +65,7 @@ label{cursor:pointer}
 .cal-day.today .cal-day-num{color:#8b7cf6;font-weight:600}
 .cal-dot{font-size:10px;padding:1px 5px;border-radius:5px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;display:block;max-width:100%}
 .cal-dot:hover{opacity:.8;text-decoration:underline}
+.cal-dot-cadastro{background:#1a1f2e;color:#7b8fc9}
 .cal-dot-roteiro{background:#2a1f52;color:#9b7cf6}
 .cal-dot-gravacao{background:#1a2e3d;color:#5bafd6}
 .cal-dot-edicao{background:#2d1f0a;color:#c9883a}
@@ -245,6 +246,10 @@ textarea{resize:vertical}
     </div>
   </div>
   <div class="fg"><label class="fl">Observações</label><textarea id="f-obs" rows="2" placeholder="Notas gerais..."></textarea></div>
+  <div class="fg">
+    <label class="fl">Data de criação <span style="color:#555;font-weight:400;text-transform:none;letter-spacing:0">(opcional — preencha só se for retroativo)</span></label>
+    <input type="date" id="f-criado-em" style="width:200px"/>
+  </div>
   <div class="mactions">
     <button class="btn-cancel" onclick="closeAdd()">Cancelar</button>
     <button class="btn-ok" onclick="submitAdd()" id="btn-add-ok">Adicionar vídeo</button>
@@ -379,6 +384,7 @@ let calYear  = new Date().getFullYear();
 let calMonth = new Date().getMonth(); // 0-based
 
 const CAL_STAGES = [
+  { key:'criadoEm',        label:'Cadastro',   cls:'cal-dot-cadastro',   icon:'＋' },
   { key:'roteiroFeitoEm',  label:'Roteiro',    cls:'cal-dot-roteiro',    icon:'✦' },
   { key:'gravacaoFeitaEm', label:'Gravação',   cls:'cal-dot-gravacao',   icon:'◉' },
   { key:'edicaoFeitaEm',   label:'Edição',     cls:'cal-dot-edicao',     icon:'◈' },
@@ -654,13 +660,12 @@ function validateAndGetFields(esteira){
   return {errors, body};
 }
 
-async function tog(vid, esteira){
+async function tog(vid, esteira, dataRetroativa=''){
   const v=videos.find(x=>x.id===vid);
   if(!v) return;
   const k='status'+cap(esteira);
   const alreadyDone=v[k]==='done';
 
-  // If UN-marking done → no validation needed, just toggle back
   if(alreadyDone){
     saving(true);
     const upd=await api(`/api/videos/${vid}/toggle`,'POST',{esteira});
@@ -672,17 +677,16 @@ async function tog(vid, esteira){
     return;
   }
 
-  // Validate required fields for this stage
   const {errors, body}=validateAndGetFields(esteira);
-  if(errors.length>0) return; // stop — fields are highlighted
+  if(errors.length>0) return;
 
-  // Save the field values first, then toggle
   saving(true);
   if(Object.keys(body).length>0) await api(`/api/videos/${vid}`,'PUT',body);
-  const upd=await api(`/api/videos/${vid}/toggle`,'POST',{esteira});
+  const toggleBody={esteira};
+  if(dataRetroativa) toggleBody.data_retroativa=dataRetroativa;
+  const upd=await api(`/api/videos/${vid}/toggle`,'POST',toggleBody);
   const i=videos.findIndex(x=>x.id===vid); if(i!==-1) videos[i]=upd;
 
-  // If publicação just got finalized → close modal, go to Finalizados tab
   if(esteira==='publicacao' && upd.statusPublicacao==='done' && isConcluido(upd)){
     closeDetail();
     const finBtn=document.querySelector('.tab[onclick*="finalizados"]');
@@ -700,16 +704,44 @@ async function tog(vid, esteira){
 // ── Confirm advance to next stage ─────────────────────────────────────────────
 
 async function confirmAdvance(vid, esteira){
-  // First save any edited fields
   await saveDetailFields(vid);
-  // Validate
   const {errors}=validateAndGetFields(esteira);
   if(errors.length>0) return;
-  // Confirmation dialog
-  const nextLabel=NEXT_LABEL[esteira]||'avançar';
-  const confirmed=confirm(`Confirmar: "${nextLabel}"?\n\nIsso finalizará a etapa de ${EL[esteira]} e avançará para a próxima.`);
-  if(!confirmed) return;
-  await tog(vid, esteira);
+
+  // Show a mini confirmation modal with optional retroactive date
+  const nextLabel=NEXT_LABEL[esteira]||'Avançar';
+  const today=new Date().toISOString().slice(0,10);
+
+  // inject a tiny confirm modal
+  let m=document.getElementById('m-advance-confirm');
+  if(!m){
+    m=document.createElement('div');
+    m.id='m-advance-confirm';
+    m.className='overlay';
+    m.style.zIndex='300';
+    document.body.appendChild(m);
+  }
+  m.innerHTML=`<div class="modal" style="width:340px" onclick="event.stopPropagation()">
+    <h3 style="margin-bottom:8px">${nextLabel}</h3>
+    <div style="font-size:12px;color:#777;margin-bottom:16px">Finaliza a etapa de <strong style="color:#e8e4d8">${EL[esteira]}</strong> e avança para a próxima.</div>
+    <div class="fg">
+      <label class="fl">Data de conclusão <span style="color:#555;font-weight:400;text-transform:none;letter-spacing:0">(deixe em branco para usar hoje)</span></label>
+      <input type="date" id="advance-date" value="" max="${today}" style="width:100%"/>
+    </div>
+    <div class="mactions">
+      <button class="btn-cancel" onclick="document.getElementById('m-advance-confirm').style.display='none'">Cancelar</button>
+      <button class="btn-ok" onclick="doAdvance('${vid}','${esteira}')">${nextLabel}</button>
+    </div>
+  </div>`;
+  m.style.display='flex';
+  setTimeout(()=>document.getElementById('advance-date')?.focus(),50);
+}
+
+async function doAdvance(vid, esteira){
+  const dateInput=document.getElementById('advance-date');
+  const dataRetroativa=dateInput?.value||'';
+  document.getElementById('m-advance-confirm').style.display='none';
+  await tog(vid, esteira, dataRetroativa);
 }
 
 // ── Add/Edit modal ────────────────────────────────────────────────────────────
@@ -738,6 +770,8 @@ function openAdd(vid){
     document.getElementById('f-gravacao').checked=v.esteiras.gravacao;
     document.getElementById('f-edicao').checked=v.esteiras.edicao;
     document.getElementById('f-publicacao').checked=v.esteiras.publicacao;
+    // pre-fill creation date when editing
+    document.getElementById('f-criado-em').value=v.criadoEm?v.criadoEm.slice(0,10):'';
   } else {
     document.getElementById('f-titulo').value='';
     tipoSel.value='';
@@ -748,6 +782,7 @@ function openAdd(vid){
     document.getElementById('f-edicao').checked=true;
     document.getElementById('f-publicacao').checked=true;
   }
+  document.getElementById('f-criado-em').value='';
   document.getElementById('m-add').style.display='flex';
   setTimeout(()=>document.getElementById('f-titulo').focus(),50);
 }
@@ -768,6 +803,8 @@ async function submitAdd(){
       publicacao:document.getElementById('f-publicacao').checked,
     }
   };
+  const dataCriacao=document.getElementById('f-criado-em')?.value;
+  if(dataCriacao) body.criado_em=dataCriacao;
   if(editVidId){
     const upd=await api(`/api/videos/${editVidId}`,'PUT',body);
     const i=videos.findIndex(v=>v.id===editVidId);
@@ -836,12 +873,18 @@ function renderDetailBody(v){
     const isCurrent=v.currentStage===e;
     const canInteract=isDone||isCurrent;
     const disabled=!canInteract?'disabled':'';
-    let btnLabel, btnClass;
-    if(isDone){ btnLabel='✓ feito'; btnClass='done'; }
-    else if(isCurrent){ btnLabel='em andamento'; btnClass='pending active-stage'; }
-    else { btnLabel='pendente'; btnClass='pending'; }
-    // Only done stages can be un-toggled; current shows status; locked is disabled
-    const clickable=isDone?`onclick="tog('${v.id}','${e}')"`:'';
+    let btnLabel, btnClass, clickable;
+    if(isDone){
+      btnLabel='✓ feito'; btnClass='done';
+      clickable=`onclick="tog('${v.id}','${e}')"`;
+    } else if(isCurrent){
+      btnLabel='em andamento'; btnClass='pending active-stage';
+      // clicking opens the advance modal with date picker
+      clickable=`onclick="confirmAdvance('${v.id}','${e}')"`;
+    } else {
+      btnLabel='pendente'; btnClass='pending';
+      clickable='';
+    }
     return `<div class="est-row">
       <span class="est-row-name">${EE[e]} ${EL[e]}</span>
       <button class="tog ${btnClass}" ${!canInteract?'disabled':''} ${clickable}>${btnLabel}</button>

@@ -196,12 +196,20 @@ def list_videos():
 @app.route("/api/videos", methods=["POST"])
 def create_video():
     data = request.json; e = data.get("esteiras", {})
+    # optional retroactive creation date
+    criado_em = datetime.utcnow()
+    if data.get("criado_em"):
+        try:
+            criado_em = datetime.strptime(data["criado_em"], "%Y-%m-%d")
+        except ValueError:
+            pass
     v = Video(
         id=str(int(datetime.utcnow().timestamp() * 1000)),
         titulo=data["titulo"].strip(), tipo=data.get("tipo", ""),
         professor_id=data.get("professor_id") or None, obs=data.get("obs", ""),
         usa_roteiro=e.get("roteiro", True), usa_gravacao=e.get("gravacao", True),
         usa_edicao=e.get("edicao", True), usa_publicacao=e.get("publicacao", True),
+        criado_em=criado_em,
     )
     db.session.add(v); db.session.commit(); return jsonify(v.to_dict()), 201
 
@@ -213,11 +221,16 @@ def update_video(vid_id):
         if f in data: setattr(v, f, data[f])
     if "professor_id" in data: v.professor_id = data["professor_id"] or None
     if "pub_plataformas" in data: v.pub_plataformas = json.dumps(data["pub_plataformas"])
+    if "criado_em" in data and data["criado_em"]:
+        try: v.criado_em = datetime.strptime(data["criado_em"], "%Y-%m-%d")
+        except ValueError: pass
     db.session.commit(); return jsonify(v.to_dict())
 
 @app.route("/api/videos/<vid_id>/toggle", methods=["POST"])
 def toggle_status(vid_id):
-    v = Video.query.get_or_404(vid_id); esteira = request.json.get("esteira")
+    v = Video.query.get_or_404(vid_id)
+    data = request.json
+    esteira = data.get("esteira")
     if esteira not in {"roteiro","gravacao","edicao","publicacao"}:
         return jsonify({"error": "inválido"}), 400
     cur = getattr(v, f"status_{esteira}")
@@ -225,7 +238,21 @@ def toggle_status(vid_id):
     setattr(v, f"status_{esteira}", ns)
     ts = {"roteiro":"roteiro_feito_em","gravacao":"gravacao_feita_em",
           "edicao":"edicao_feita_em","publicacao":"publicado_em"}
-    setattr(v, ts[esteira], datetime.utcnow() if ns == "done" else None)
+    if ns == "done":
+        # use retroactive date if provided, otherwise now
+        data_retroativa = data.get("data_retroativa")
+        if data_retroativa:
+            try:
+                dt = datetime.strptime(data_retroativa, "%Y-%m-%d")
+                # set to end of that day to keep chronological order
+                dt = dt.replace(hour=23, minute=59, second=0)
+            except ValueError:
+                dt = datetime.utcnow()
+        else:
+            dt = datetime.utcnow()
+        setattr(v, ts[esteira], dt)
+    else:
+        setattr(v, ts[esteira], None)
     v.concluido_em = datetime.utcnow() if v.is_concluido() else None
     db.session.commit(); return jsonify(v.to_dict())
 
