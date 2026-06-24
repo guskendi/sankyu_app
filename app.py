@@ -308,9 +308,10 @@ class Instrumento(db.Model):
 
 class Musica(db.Model):
     __tablename__ = "scout_musicas"
-    id   = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    nome = db.Column(db.String(200), nullable=False, unique=True)
-    def to_dict(self): return {"id":self.id,"nome":self.nome}
+    id      = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    nome    = db.Column(db.String(200), nullable=False, unique=True)
+    duracao = db.Column(db.Integer, default=0)  # segundos
+    def to_dict(self): return {"id":self.id,"nome":self.nome,"duracao":self.duracao or 0}
 
 class Aluno(db.Model):
     __tablename__ = "scout_alunos"
@@ -441,16 +442,22 @@ def scout_list_musicas():
 
 @app.route("/api/scout/musicas", methods=["POST"])
 def scout_create_musica():
-    nome = request.json.get("nome","").strip()
+    data = request.json
+    nome = data.get("nome","").strip()
     if not nome: return jsonify({"error":"Nome obrigatório"}),400
     if Musica.query.filter_by(nome=nome).first(): return jsonify({"error":"Já existe"}),409
-    m = Musica(nome=nome); db.session.add(m); db.session.commit()
+    m = Musica(nome=nome, duracao=int(data.get("duracao",0)))
+    db.session.add(m); db.session.commit()
     return jsonify(m.to_dict()),201
 
 @app.route("/api/scout/musicas/<int:mid>", methods=["PUT"])
 def scout_update_musica(mid):
     m = Musica.query.get_or_404(mid)
-    m.nome = request.json.get("nome",m.nome).strip()
+    data = request.json
+    new_nome = data.get("nome", m.nome).strip()
+    if new_nome != m.nome:
+        m.nome = new_nome
+    if "duracao" in data: m.duracao = int(data["duracao"])
     db.session.commit(); return jsonify(m.to_dict())
 
 @app.route("/api/scout/musicas/<int:mid>", methods=["DELETE"])
@@ -745,6 +752,173 @@ def gerar_qrcode(tipo):
         return jsonify({"url": url, "svg": svg})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MÓDULO PALCO
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class Apresentacao(db.Model):
+    __tablename__ = "palco_apresentacoes"
+    id          = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    nome        = db.Column(db.String(200), nullable=False)
+    local       = db.Column(db.String(200), default="")
+    data        = db.Column(db.String(50), default="")
+    palco_w     = db.Column(db.Integer, default=800)   # largura em px (proporcional)
+    palco_h     = db.Column(db.Integer, default=500)   # altura em px
+    obs         = db.Column(db.Text, default="")
+    criado_em   = db.Column(db.DateTime, default=datetime.utcnow)
+    musicas     = db.relationship("PalcoMusica", backref="apresentacao",
+                                  cascade="all,delete-orphan", order_by="PalcoMusica.ordem")
+
+    def to_dict(self):
+        return {"id":self.id,"nome":self.nome,"local":self.local,"data":self.data,
+                "palcoW":self.palco_w,"palcoH":self.palco_h,"obs":self.obs,
+                "criadoEm":self.criado_em.isoformat() if self.criado_em else None,
+                "totalMusicas":len(self.musicas)}
+
+class PalcoPessoa(db.Model):
+    __tablename__ = "palco_pessoas"
+    id       = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    nome     = db.Column(db.String(150), nullable=False)
+    cor      = db.Column(db.String(10), default="#5bafd6")
+    obs      = db.Column(db.String(300), default="")
+    ativo    = db.Column(db.Boolean, default=True)  # False = arquivada
+
+    def to_dict(self):
+        return {"id":self.id,"nome":self.nome,"cor":self.cor,"obs":self.obs,"ativo":self.ativo}
+
+class PalcoMusica(db.Model):
+    __tablename__ = "palco_musicas"
+    id              = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    apresentacao_id = db.Column(db.Integer, db.ForeignKey("palco_apresentacoes.id"), nullable=False)
+    nome            = db.Column(db.String(200), nullable=False)
+    ordem           = db.Column(db.Integer, default=0)
+    obs             = db.Column(db.Text, default="")
+    duracao         = db.Column(db.Integer, default=0)  # segundos
+    elementos       = db.Column(db.Text, default="[]")
+
+    def to_dict(self):
+        try:
+            els = json.loads(self.elementos) if self.elementos else []
+        except Exception:
+            els = []
+        return {"id":self.id,"apresentacaoId":self.apresentacao_id,
+                "nome":self.nome,"ordem":self.ordem,"obs":self.obs,
+                "duracao":self.duracao or 0,"elementos":els}
+
+# ── Rotas Palco ───────────────────────────────────────────────────────────────
+
+@app.route("/palco")
+def palco_index():
+    return render_template("palco.html")
+
+# Apresentações
+@app.route("/api/palco/apresentacoes")
+def palco_list_apres():
+    items = Apresentacao.query.order_by(Apresentacao.criado_em.desc()).all()
+    return jsonify([a.to_dict() for a in items])
+
+@app.route("/api/palco/apresentacoes", methods=["POST"])
+def palco_create_apres():
+    d = request.json
+    a = Apresentacao(nome=d["nome"].strip(), local=d.get("local",""),
+                     data=d.get("data",""), palco_w=d.get("palcoW",800),
+                     palco_h=d.get("palcoH",500), obs=d.get("obs",""))
+    db.session.add(a); db.session.commit()
+    return jsonify(a.to_dict()), 201
+
+@app.route("/api/palco/apresentacoes/<int:aid>")
+def palco_get_apres(aid):
+    a = Apresentacao.query.get_or_404(aid)
+    d = a.to_dict()
+    d["musicas"] = [m.to_dict() for m in a.musicas]
+    return jsonify(d)
+
+@app.route("/api/palco/apresentacoes/<int:aid>", methods=["PUT"])
+def palco_update_apres(aid):
+    a = Apresentacao.query.get_or_404(aid); d = request.json
+    for f in ["nome","local","data","obs"]:
+        if f in d: setattr(a, f, d[f])
+    if "palcoW" in d: a.palco_w = int(d["palcoW"])
+    if "palcoH" in d: a.palco_h = int(d["palcoH"])
+    db.session.commit(); return jsonify(a.to_dict())
+
+@app.route("/api/palco/apresentacoes/<int:aid>", methods=["DELETE"])
+def palco_delete_apres(aid):
+    a = Apresentacao.query.get_or_404(aid); db.session.delete(a)
+    db.session.commit(); return jsonify({"ok":True})
+
+# Pessoas
+@app.route("/api/palco/pessoas")
+def palco_list_pessoas():
+    todas = request.args.get("todas","0")=="1"
+    q = PalcoPessoa.query.order_by(PalcoPessoa.nome)
+    if not todas: q = q.filter_by(ativo=True)
+    return jsonify([p.to_dict() for p in q.all()])
+
+@app.route("/api/palco/pessoas", methods=["POST"])
+def palco_create_pessoa():
+    d = request.json
+    p = PalcoPessoa(nome=d["nome"].strip(), cor=d.get("cor","#5bafd6"), obs=d.get("obs",""), ativo=True)
+    db.session.add(p); db.session.commit()
+    return jsonify(p.to_dict()), 201
+
+@app.route("/api/palco/pessoas/<int:pid>", methods=["PUT"])
+def palco_update_pessoa(pid):
+    p = PalcoPessoa.query.get_or_404(pid); d = request.json
+    for f in ["nome","cor","obs"]:
+        if f in d: setattr(p, f, d[f])
+    if "ativo" in d: p.ativo = bool(d["ativo"])
+    db.session.commit(); return jsonify(p.to_dict())
+
+@app.route("/api/palco/pessoas/<int:pid>", methods=["DELETE"])
+def palco_delete_pessoa(pid):
+    p = PalcoPessoa.query.get_or_404(pid)
+    # soft delete — keep for history
+    p.ativo = False
+    db.session.commit(); return jsonify({"ok":True,"arquivada":True})
+
+# Músicas
+@app.route("/api/palco/musicas", methods=["POST"])
+def palco_create_musica():
+    d = request.json
+    # get max ordem for this apresentacao
+    max_ordem = db.session.query(db.func.max(PalcoMusica.ordem))\
+                  .filter_by(apresentacao_id=d["apresentacaoId"]).scalar() or 0
+    m = PalcoMusica(apresentacao_id=d["apresentacaoId"], nome=d["nome"].strip(),
+                    ordem=max_ordem+1, obs=d.get("obs",""),
+                    duracao=int(d.get("duracao",0)),
+                    elementos=json.dumps(d.get("elementos",[])))
+    db.session.add(m); db.session.commit()
+    return jsonify(m.to_dict()), 201
+
+@app.route("/api/palco/musicas/<int:mid>", methods=["PUT"])
+def palco_update_musica(mid):
+    m = PalcoMusica.query.get_or_404(mid); d = request.json
+    for f in ["nome","obs"]:
+        if f in d: setattr(m, f, d[f])
+    if "ordem" in d: m.ordem = int(d["ordem"])
+    if "duracao" in d: m.duracao = int(d["duracao"])
+    if "elementos" in d: m.elementos = json.dumps(d["elementos"])
+    db.session.commit(); return jsonify(m.to_dict())
+
+@app.route("/api/palco/musicas/<int:mid>", methods=["DELETE"])
+def palco_delete_musica(mid):
+    m = PalcoMusica.query.get_or_404(mid); db.session.delete(m)
+    db.session.commit(); return jsonify({"ok":True})
+
+@app.route("/api/palco/musicas/<int:mid>/duplicate", methods=["POST"])
+def palco_duplicate_musica(mid):
+    m = PalcoMusica.query.get_or_404(mid)
+    max_ordem = db.session.query(db.func.max(PalcoMusica.ordem))\
+                  .filter_by(apresentacao_id=m.apresentacao_id).scalar() or 0
+    novo = PalcoMusica(apresentacao_id=m.apresentacao_id,
+                       nome=m.nome + " (cópia)", ordem=max_ordem+1,
+                       obs=m.obs, elementos=m.elementos)
+    db.session.add(novo); db.session.commit()
+    return jsonify(novo.to_dict()), 201
 
 
 with app.app_context():
