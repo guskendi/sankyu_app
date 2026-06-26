@@ -462,8 +462,9 @@ function draw(animEls=null){
   els.forEach(el=>drawElement(el, el===selected));
 
   // Draw snap guide lines on top (only when dragging, not during animation)
-  if(animEls===null && (snapLines.hx.length>0 || snapLines.vy.length>0)){
+  if(animEls===null && (snapLines.hx.length>0 || snapLines.vy.length>0 || (snapLines.dist&&snapLines.dist.length>0))){
     ctx.save();
+    // Alignment lines (purple dashed)
     ctx.strokeStyle='#8b7cf6';
     ctx.lineWidth=1*SCALE;
     ctx.setLineDash([5*SCALE,4*SCALE]);
@@ -474,7 +475,43 @@ function draw(animEls=null){
     snapLines.vy.forEach(gy=>{
       ctx.beginPath(); ctx.moveTo(0,gy*SCALE); ctx.lineTo(W,gy*SCALE); ctx.stroke();
     });
+    // Distribution indicators (orange)
+    if(snapLines.dist&&snapLines.dist.length>0){
+      ctx.setLineDash([]);
+      ctx.globalAlpha=0.9;
+      ctx.strokeStyle='#c9883a';
+      ctx.fillStyle='#c9883a';
+      ctx.lineWidth=1.5*SCALE;
+      snapLines.dist.forEach(d=>{
+        if(d.type==='hspacing'){
+          const yy=Math.min(d.ay,d.by,d.cy)*SCALE - 10*SCALE;
+          const pts=[d.ax,d.bx,d.cx].sort((a,b)=>a-b).map(v=>v*SCALE);
+          _drawDistBracket(ctx,pts[0],pts[1],yy,'h');
+          _drawDistBracket(ctx,pts[1],pts[2],yy,'h');
+        } else {
+          const xx=Math.max(d.ax,d.bx,d.cx)*SCALE + 10*SCALE;
+          const pts=[d.ay,d.by,d.cy].sort((a,b)=>a-b).map(v=>v*SCALE);
+          _drawDistBracket(ctx,pts[0],pts[1],xx,'v');
+          _drawDistBracket(ctx,pts[1],pts[2],xx,'v');
+        }
+      });
+    }
     ctx.restore();
+  }
+}
+
+function _drawDistBracket(ctx, a, b, off, dir){
+  const tick=5*SCALE;
+  if(dir==='h'){
+    // horizontal bracket: line from a to b at y=off, ticks at ends
+    ctx.beginPath(); ctx.moveTo(a,off); ctx.lineTo(b,off); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(a,off-tick); ctx.lineTo(a,off+tick); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(b,off-tick); ctx.lineTo(b,off+tick); ctx.stroke();
+  } else {
+    // vertical bracket: line from a to b at x=off, ticks at ends
+    ctx.beginPath(); ctx.moveTo(off,a); ctx.lineTo(off,b); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(off-tick,a); ctx.lineTo(off+tick,a); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(off-tick,b); ctx.lineTo(off+tick,b); ctx.stroke();
   }
 }
 
@@ -766,23 +803,64 @@ canvas.addEventListener('mousedown',e=>{
 
 // ── Snap / guide lines ────────────────────────────────────────────────────────
 const SNAP_DIST = 8; // pixels in canvas coords — snap threshold
-let snapLines = { hx:[], vy:[] }; // guide lines to draw: hx = horizontal (same x), vy = vertical (same y)
+let snapLines = { hx:[], vy:[], dist:[] };
 
 function applySnap(rawX, rawY, moving){
   const others = elementos.filter(e=>e!==moving);
   let x=rawX, y=rawY;
-  let sx=null, sy=null; // snapped value
+  let sx=null, sy=null;
 
+  // 1. Alignment snap (same X or Y as another element)
   others.forEach(o=>{
-    // horizontal alignment (same X)
     if(Math.abs(rawX - o.x) <= SNAP_DIST){ if(sx===null || Math.abs(rawX-o.x)<Math.abs(rawX-sx)) sx=o.x; }
-    // vertical alignment (same Y)
     if(Math.abs(rawY - o.y) <= SNAP_DIST){ if(sy===null || Math.abs(rawY-o.y)<Math.abs(rawY-sy)) sy=o.y; }
   });
 
-  snapLines = { hx:[], vy:[] };
+  snapLines = { hx:[], vy:[], dist:[] };
   if(sx!==null){ x=sx; snapLines.hx.push(sx); }
   if(sy!==null){ y=sy; snapLines.vy.push(sy); }
+
+  // 2. Distribution snap — equal spacing between 3 elements
+  // For each pair of existing elements, check if moving element would complete equal spacing
+  for(let i=0;i<others.length;i++){
+    for(let j=0;j<others.length;j++){
+      if(i===j) continue;
+      const a=others[i], b=others[j];
+
+      // Horizontal distribution: a, b, moving — check if moving completes equal X spacing
+      const dxAB=b.x - a.x;
+      if(Math.abs(dxAB)>4){ // meaningful spacing
+        const candidateX=b.x + dxAB; // moving should be at b.x + same gap
+        if(Math.abs(rawX - candidateX) <= SNAP_DIST){
+          x=candidateX;
+          // draw spacing indicators
+          snapLines.dist.push({type:'hspacing', ax:a.x, ay:a.y, bx:b.x, by:b.y, cx:candidateX, cy:rawY});
+        }
+        // also check other side: moving between a and b mirrored
+        const candidateX2=a.x - dxAB;
+        if(Math.abs(rawX - candidateX2) <= SNAP_DIST){
+          x=candidateX2;
+          snapLines.dist.push({type:'hspacing', ax:candidateX2, ay:rawY, bx:a.x, by:a.y, cx:b.x, cy:b.y});
+        }
+      }
+
+      // Vertical distribution: check if moving completes equal Y spacing
+      const dyAB=b.y - a.y;
+      if(Math.abs(dyAB)>4){
+        const candidateY=b.y + dyAB;
+        if(Math.abs(rawY - candidateY) <= SNAP_DIST){
+          y=candidateY;
+          snapLines.dist.push({type:'vspacing', ax:a.x, ay:a.y, bx:b.x, by:b.y, cx:rawX, cy:candidateY});
+        }
+        const candidateY2=a.y - dyAB;
+        if(Math.abs(rawY - candidateY2) <= SNAP_DIST){
+          y=candidateY2;
+          snapLines.dist.push({type:'vspacing', ax:rawX, ay:candidateY2, bx:a.x, by:a.y, cx:b.x, cy:b.y});
+        }
+      }
+    }
+  }
+
   return {x, y};
 }
 
@@ -806,12 +884,12 @@ canvas.addEventListener('mousemove',e=>{
 
 canvas.addEventListener('mouseup',()=>{
   mouseDown=false;
-  snapLines={hx:[],vy:[]};
+  snapLines={hx:[],vy:[],dist:[]};
   draw();
 });
 canvas.addEventListener('mouseleave',()=>{
   mouseDown=false;
-  snapLines={hx:[],vy:[]};
+  snapLines={hx:[],vy:[],dist:[]};
 });
 
 // Touch support
