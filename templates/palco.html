@@ -16,6 +16,32 @@ button{font-family:inherit;cursor:pointer}
 /* ── Layout ── */
 .app{display:grid;grid-template-columns:280px 1fr 240px;grid-template-rows:48px 1fr;height:100vh}
 
+/* ── Responsive ── */
+@media (max-width:1280px){
+  .app{grid-template-columns:220px 1fr 200px}
+  .hdr-logo{height:22px}
+  .hdr-title{font-size:13px}
+  .hdr-sub{font-size:9px}
+  .btn-hdr{padding:4px 10px;font-size:10px}
+  .setlist{padding:6px}
+  .music-item{padding:6px 8px}
+  .music-name{font-size:11px}
+  .music-num{font-size:9px}
+  .tool-section{padding:8px 10px}
+  .tool-label{font-size:8px;margin-bottom:5px}
+  .tool-item{padding:5px 8px;font-size:11px}
+  .tool-icon{width:20px;height:20px;font-size:8px}
+  .pessoa-item{padding:4px 8px}
+  .pessoa-circle{width:22px;height:22px;font-size:8px}
+  .panel-section{padding:8px 10px}
+  .apres-select{font-size:11px;padding:4px 6px}
+  .btn-sm{padding:3px 7px;font-size:10px}
+}
+@media (max-width:1024px){
+  .app{grid-template-columns:190px 1fr 180px}
+  .hdr-title{font-size:12px}
+}
+
 /* ── Header ── */
 .hdr{grid-column:1/-1;background:#0e0e0f;border-bottom:1px solid #1e1e20;
   display:flex;align-items:center;justify-content:space-between;padding:0 16px;position:relative;z-index:20}
@@ -434,6 +460,22 @@ function draw(animEls=null){
 
   // Draw elements
   els.forEach(el=>drawElement(el, el===selected));
+
+  // Draw snap guide lines on top (only when dragging, not during animation)
+  if(animEls===null && (snapLines.hx.length>0 || snapLines.vy.length>0)){
+    ctx.save();
+    ctx.strokeStyle='#8b7cf6';
+    ctx.lineWidth=1*SCALE;
+    ctx.setLineDash([5*SCALE,4*SCALE]);
+    ctx.globalAlpha=0.8;
+    snapLines.hx.forEach(gx=>{
+      ctx.beginPath(); ctx.moveTo(gx*SCALE,0); ctx.lineTo(gx*SCALE,H); ctx.stroke();
+    });
+    snapLines.vy.forEach(gy=>{
+      ctx.beginPath(); ctx.moveTo(0,gy*SCALE); ctx.lineTo(W,gy*SCALE); ctx.stroke();
+    });
+    ctx.restore();
+  }
 }
 
 function _drawEquipIcon(ctx, type, x, y, hw, isSelected){
@@ -722,11 +764,37 @@ canvas.addEventListener('mousedown',e=>{
   draw();
 });
 
+// ── Snap / guide lines ────────────────────────────────────────────────────────
+const SNAP_DIST = 8; // pixels in canvas coords — snap threshold
+let snapLines = { hx:[], vy:[] }; // guide lines to draw: hx = horizontal (same x), vy = vertical (same y)
+
+function applySnap(rawX, rawY, moving){
+  const others = elementos.filter(e=>e!==moving);
+  let x=rawX, y=rawY;
+  let sx=null, sy=null; // snapped value
+
+  others.forEach(o=>{
+    // horizontal alignment (same X)
+    if(Math.abs(rawX - o.x) <= SNAP_DIST){ if(sx===null || Math.abs(rawX-o.x)<Math.abs(rawX-sx)) sx=o.x; }
+    // vertical alignment (same Y)
+    if(Math.abs(rawY - o.y) <= SNAP_DIST){ if(sy===null || Math.abs(rawY-o.y)<Math.abs(rawY-sy)) sy=o.y; }
+  });
+
+  snapLines = { hx:[], vy:[] };
+  if(sx!==null){ x=sx; snapLines.hx.push(sx); }
+  if(sy!==null){ y=sy; snapLines.vy.push(sy); }
+  return {x, y};
+}
+
 canvas.addEventListener('mousemove',e=>{
   if(!mouseDown||!selected) return;
   const pos=canvasPos(e);
-  selected.x=Math.round(pos.x-mouseOffset.x);
-  selected.y=Math.round(pos.y-mouseOffset.y);
+  let rawX=Math.round(pos.x-mouseOffset.x);
+  let rawY=Math.round(pos.y-mouseOffset.y);
+  // apply magnetic snap
+  const snapped=applySnap(rawX, rawY, selected);
+  selected.x=snapped.x;
+  selected.y=snapped.y;
   // clamp within stage (excluding audience)
   const r=selected.r||22;
   const audH=Math.round(PALCO_H*0.14);
@@ -736,8 +804,15 @@ canvas.addEventListener('mousemove',e=>{
   scheduleAutoSave();
 });
 
-canvas.addEventListener('mouseup',()=>{ mouseDown=false; });
-canvas.addEventListener('mouseleave',()=>{ mouseDown=false; });
+canvas.addEventListener('mouseup',()=>{
+  mouseDown=false;
+  snapLines={hx:[],vy:[]};
+  draw();
+});
+canvas.addEventListener('mouseleave',()=>{
+  mouseDown=false;
+  snapLines={hx:[],vy:[]};
+});
 
 // Touch support
 canvas.addEventListener('touchstart',e=>{e.preventDefault();const t=e.touches[0];canvas.dispatchEvent(new MouseEvent('mousedown',{clientX:t.clientX,clientY:t.clientY}))},{passive:false});
@@ -779,12 +854,12 @@ document.getElementById('canvas-area').addEventListener('drop',e=>{
     const pid=parseInt(type.split(':')[1]);
     const p=pessoas.find(x=>x.id===pid);
     if(!p) return;
-    const el={id:Date.now(),type:'pessoa',pessoaId:p.id,nome:p.nome,cor:p.cor,instrumento:'',x,y,r:22};
+    const el={id:Date.now(),type:'pessoa',pessoaId:p.id,nome:p.nome,cor:p.cor,instrumento:'',x,y,r:12};
     elementos.push(el);
     selected=el;
     showInspector(el);
   } else {
-    const el={id:Date.now(),type,label:EQUIP_LABELS[type]||type,x,y,r:18};
+    const el={id:Date.now(),type,label:EQUIP_LABELS[type]||type,x,y,r:12};
     elementos.push(el);
     selected=el;
     showInspector(el);
