@@ -939,7 +939,6 @@ canvas.addEventListener('mousemove',e=>{
     draw(); scheduleAutoSave(); return;
   }
   if(!mouseDown||!selected) return;
-  const pos=canvasPos(e);
   let rawX=Math.round(pos.x-mouseOffset.x);
   let rawY=Math.round(pos.y-mouseOffset.y);
   // apply magnetic snap
