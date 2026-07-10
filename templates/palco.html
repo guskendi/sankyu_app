@@ -278,6 +278,18 @@ button{font-family:inherit;cursor:pointer}
       <div id="pessoas-list"></div>
     </div>
 
+    <div class="tool-section">
+      <div class="tool-label">Anotações</div>
+      <div class="tool-item" draggable="true" ondragstart="dragStart(event,'grupo')" data-type="grupo" style="cursor:grab">
+        <div class="tool-icon" style="background:transparent;border:2px solid #8b7cf6;border-radius:4px;color:#8b7cf6;font-size:9px;font-weight:700;font-family:'DM Mono',monospace">GRP</div>
+        <span>Grupo</span>
+      </div>
+      <div class="tool-item" draggable="true" ondragstart="dragStart(event,'texto')" data-type="texto" style="cursor:grab">
+        <div class="tool-icon" style="background:#1a1a2e;border:1px solid #5c4db1;color:#9b7cf6;font-size:11px;font-weight:700">T</div>
+        <span>Texto</span>
+      </div>
+    </div>
+
     <div class="tool-section" id="inspector-section" style="display:none">
       <div class="tool-label">Elemento selecionado</div>
       <div class="inspector" id="inspector"></div>
@@ -458,8 +470,10 @@ function draw(animEls=null){
   ctx.fillStyle='#444';
   ctx.fillText('PALCO', W/2, 12*SCALE);
 
-  // Draw elements
-  els.forEach(el=>drawElement(el, el===selected));
+  // Draw grupos first (behind everything else)
+  els.filter(el=>el.type==='grupo').forEach(el=>drawElement(el, el===selected));
+  // Draw remaining elements on top
+  els.filter(el=>el.type!=='grupo').forEach(el=>drawElement(el, el===selected));
 
   // Draw snap guide lines on top (only when dragging, not during animation)
   if(animEls===null && (snapLines.hx.length>0 || snapLines.vy.length>0 || (snapLines.dist&&snapLines.dist.length>0))){
@@ -664,9 +678,53 @@ function _drawEquipIcon(ctx, type, x, y, hw, isSelected){
 
 function drawElement(el, isSelected){
   const x=el.x*SCALE, y=el.y*SCALE;
+  const acc=el.acessorio||'';
+
+  // ── Grupo ────────────────────────────────────────────────────────────────
+  if(el.type==='grupo'){
+    const w=(el.w||120)*SCALE, h=(el.h||80)*SCALE;
+    ctx.save();
+    if(isSelected){ ctx.shadowColor='#8b7cf6'; ctx.shadowBlur=10; }
+    ctx.strokeStyle=el.cor||'#8b7cf6';
+    ctx.lineWidth=2*SCALE;
+    ctx.setLineDash([6*SCALE,4*SCALE]);
+    ctx.strokeRect(x-w/2, y-h/2, w, h);
+    ctx.setLineDash([]);
+    // label top-left inside box
+    ctx.font=`bold ${Math.round(11*SCALE)}px Noto Serif,serif`;
+    ctx.fillStyle=el.cor||'#8b7cf6';
+    ctx.textAlign='left'; ctx.textBaseline='top';
+    ctx.fillText(el.label||'Grupo', x-w/2+6*SCALE, y-h/2+4*SCALE);
+    // resize handle bottom-right
+    if(isSelected){
+      ctx.fillStyle=el.cor||'#8b7cf6';
+      ctx.fillRect(x+w/2-8*SCALE, y+h/2-8*SCALE, 8*SCALE, 8*SCALE);
+    }
+    ctx.restore();
+    return;
+  }
+
+  // ── Texto livre ───────────────────────────────────────────────────────────
+  if(el.type==='texto'){
+    const fs=Math.round((el.fontSize||13)*SCALE);
+    ctx.save();
+    if(isSelected){ ctx.shadowColor='#8b7cf6'; ctx.shadowBlur=8; }
+    ctx.font=`bold ${fs}px Noto Serif,serif`;
+    ctx.fillStyle=el.cor||'#e8e4d8';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(el.label||'Texto', x, y);
+    if(isSelected){
+      const tw=ctx.measureText(el.label||'Texto').width;
+      ctx.strokeStyle='#8b7cf6'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+      ctx.strokeRect(x-tw/2-4, y-fs/2-3, tw+8, fs+6);
+      ctx.setLineDash([]);
+    }
+    ctx.restore();
+    return;
+  }
+
   const r=el.r||22;
   const sr=r*SCALE;
-  const acc=el.acessorio||'';
 
   ctx.save();
   if(isSelected){
@@ -792,9 +850,16 @@ canvas.addEventListener('mousedown',e=>{
   const pos=canvasPos(e);
   const hit=hitTest(pos.x,pos.y);
   if(hit){
-    selected=hit; mouseDown=true;
-    mouseOffset={x:pos.x-hit.x,y:pos.y-hit.y};
-    showInspector(hit);
+    const el=hit.el||hit;
+    if(hit.resize && el.type==='grupo'){
+      resizingGrupo=el;
+      grupoResizeStart={x:pos.x,y:pos.y,w:el.w||120,h:el.h||80};
+      selected=el; showInspector(el);
+    } else {
+      selected=el; mouseDown=true;
+      mouseOffset={x:pos.x-el.x,y:pos.y-el.y};
+      showInspector(el);
+    }
   } else {
     selected=null; hideInspector();
   }
@@ -865,6 +930,14 @@ function applySnap(rawX, rawY, moving){
 }
 
 canvas.addEventListener('mousemove',e=>{
+  const pos=canvasPos(e);
+  // grupo resize
+  if(resizingGrupo){
+    const dx=pos.x-grupoResizeStart.x, dy=pos.y-grupoResizeStart.y;
+    resizingGrupo.w=Math.max(40, grupoResizeStart.w+dx*2);
+    resizingGrupo.h=Math.max(30, grupoResizeStart.h+dy*2);
+    draw(); scheduleAutoSave(); return;
+  }
   if(!mouseDown||!selected) return;
   const pos=canvasPos(e);
   let rawX=Math.round(pos.x-mouseOffset.x);
@@ -883,12 +956,12 @@ canvas.addEventListener('mousemove',e=>{
 });
 
 canvas.addEventListener('mouseup',()=>{
-  mouseDown=false;
+  mouseDown=false; resizingGrupo=null;
   snapLines={hx:[],vy:[],dist:[]};
   draw();
 });
 canvas.addEventListener('mouseleave',()=>{
-  mouseDown=false;
+  mouseDown=false; resizingGrupo=null;
   snapLines={hx:[],vy:[],dist:[]};
 });
 
@@ -902,11 +975,26 @@ function canvasPos(e){
   return {x:(e.clientX-rect.left)/SCALE, y:(e.clientY-rect.top)/SCALE};
 }
 
+let resizingGrupo=null, grupoResizeStart={x:0,y:0,w:0,h:0};
+
 function hitTest(x,y){
   for(let i=elementos.length-1;i>=0;i--){
     const el=elementos[i];
-    const r=(el.r||22)*1.2;
-    if(Math.hypot(x-el.x,y-el.y)<r) return el;
+    if(el.type==='grupo'){
+      const w=el.w||120, h=el.h||80;
+      // check resize handle first (bottom-right corner)
+      if(Math.abs(x-(el.x+w/2))<10 && Math.abs(y-(el.y+h/2))<10) return {el,resize:true};
+      // check inside border (within 8px of edge)
+      const inX=x>el.x-w/2-4 && x<el.x+w/2+4;
+      const inY=y>el.y-h/2-4 && y<el.y+h/2+4;
+      const onEdge=(x<el.x-w/2+8||x>el.x+w/2-8||y<el.y-h/2+8||y>el.y+h/2-8);
+      if(inX&&inY&&(onEdge || el===selected)) return {el,resize:false};
+    } else if(el.type==='texto'){
+      if(Math.abs(x-el.x)<60 && Math.abs(y-el.y)<20) return {el,resize:false};
+    } else {
+      const r=(el.r||22)*1.2;
+      if(Math.hypot(x-el.x,y-el.y)<r) return {el,resize:false};
+    }
   }
   return null;
 }
@@ -933,6 +1021,16 @@ document.getElementById('canvas-area').addEventListener('drop',e=>{
     const p=pessoas.find(x=>x.id===pid);
     if(!p) return;
     const el={id:Date.now(),type:'pessoa',pessoaId:p.id,nome:p.nome,cor:p.cor,instrumento:'',x,y,r:12};
+    elementos.push(el);
+    selected=el;
+    showInspector(el);
+  } else if(type==='grupo'){
+    const el={id:Date.now(),type:'grupo',label:'Grupo',x,y,w:120,h:80,cor:'#8b7cf6'};
+    elementos.push(el);
+    selected=el;
+    showInspector(el);
+  } else if(type==='texto'){
+    const el={id:Date.now(),type:'texto',label:'Texto',x,y,cor:'#e8e4d8',fontSize:13};
     elementos.push(el);
     selected=el;
     showInspector(el);
@@ -966,6 +1064,35 @@ function showInspector(el){
   const sec=document.getElementById('inspector-section');
   const ins=document.getElementById('inspector');
   sec.style.display='block';
+
+  if(el.type==='grupo'){
+    ins.innerHTML=`
+      <div class="ins-field"><label class="ins-label">Nome do grupo</label>
+        <input class="ins-input" value="${el.label||'Grupo'}" oninput="updateSelected('label',this.value)"/>
+      </div>
+      <div class="ins-field"><label class="ins-label">Cor</label>
+        <input type="color" value="${el.cor||'#8b7cf6'}" onchange="updateSelected('cor',this.value)" style="width:48px;height:32px;border-radius:6px;cursor:pointer;padding:2px"/>
+      </div>
+      <div style="font-size:10px;color:#555;font-family:'DM Mono',monospace;margin-bottom:6px">Arraste o canto inferior direito para redimensionar</div>
+      <button class="btn-del-el" onclick="deleteSelected()">🗑 Remover</button>`;
+    return;
+  }
+
+  if(el.type==='texto'){
+    ins.innerHTML=`
+      <div class="ins-field"><label class="ins-label">Texto</label>
+        <input class="ins-input" value="${el.label||'Texto'}" oninput="updateSelected('label',this.value)"/>
+      </div>
+      <div class="ins-field"><label class="ins-label">Cor</label>
+        <input type="color" value="${el.cor||'#e8e4d8'}" onchange="updateSelected('cor',this.value)" style="width:48px;height:32px;border-radius:6px;cursor:pointer;padding:2px"/>
+      </div>
+      <div class="ins-field"><label class="ins-label">Tamanho da fonte</label>
+        <input type="range" min="8" max="32" value="${el.fontSize||13}" oninput="updateSelected('fontSize',parseInt(this.value));this.nextElementSibling.textContent=this.value+'px'" style="width:100%"/>
+        <span style="font-size:10px;color:#555">${el.fontSize||13}px</span>
+      </div>
+      <button class="btn-del-el" onclick="deleteSelected()">🗑 Remover</button>`;
+    return;
+  }
 
   if(el.type==='pessoa'){
     const accOpts=ACCESSORIES_PESSOA.map(a=>
@@ -1580,7 +1707,9 @@ async function exportPDF(){
       cx.font='9px DM Mono'; cx.fillStyle='#444';
       cx.fillText('PALCO',pw/2,12);
       const oldScale=SCALE; SCALE=1;
-      (m.elementos||[]).forEach(el=>drawElementOnCtx(cx,el,false,1));
+      // grupos first (behind), then rest
+      (m.elementos||[]).filter(e=>e.type==='grupo').forEach(el=>drawElementOnCtx(cx,el,false,1));
+      (m.elementos||[]).filter(e=>e.type!=='grupo').forEach(el=>drawElementOnCtx(cx,el,false,1));
       SCALE=oldScale;
       return {canvas:cv,musica:m,num:i+1};
     }));
@@ -1673,6 +1802,30 @@ async function exportPDF(){
 // draw element on any ctx with given scale
 function drawElementOnCtx(cx, el, isSelected, scale){
   const x=el.x*scale, y=el.y*scale;
+
+  if(el.type==='grupo'){
+    const w=(el.w||120)*scale, h=(el.h||80)*scale;
+    cx.save();
+    cx.strokeStyle=el.cor||'#8b7cf6'; cx.lineWidth=2*scale;
+    cx.setLineDash([6*scale,4*scale]);
+    cx.strokeRect(x-w/2,y-h/2,w,h); cx.setLineDash([]);
+    cx.font=`bold ${Math.round(11*scale)}px Noto Serif,serif`;
+    cx.fillStyle=el.cor||'#8b7cf6';
+    cx.textAlign='left'; cx.textBaseline='top';
+    cx.fillText(el.label||'Grupo',x-w/2+6*scale,y-h/2+4*scale);
+    cx.restore(); return;
+  }
+
+  if(el.type==='texto'){
+    const fs=Math.round((el.fontSize||13)*scale);
+    cx.save();
+    cx.font=`bold ${fs}px Noto Serif,serif`;
+    cx.fillStyle=el.cor||'#e8e4d8';
+    cx.textAlign='center'; cx.textBaseline='middle';
+    cx.fillText(el.label||'Texto',x,y);
+    cx.restore(); return;
+  }
+
   const r=el.r||22, sr=r*scale;
   const acc=el.acessorio||'';
   cx.save();
