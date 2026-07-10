@@ -1677,6 +1677,7 @@ async function exportPDF(){
 
       w.document.write('</div>'); // flex container
       w.document.write('</div>'); // .page
+    }); // end pdfPages.forEach
 
     w.document.write('</body></html>');
     w.document.close();
