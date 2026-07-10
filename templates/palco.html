@@ -1590,94 +1590,76 @@ async function exportPDF(){
     const apresInfo=[curApres.local,curApres.data?fmtDate(curApres.data):''].filter(Boolean).join(' · ');
     const totalMusicas=pages.length;
 
-    // 2 músicas por página
-    const pdfPages=[];
-    for(let i=0;i<pages.length;i+=2) pdfPages.push(pages.slice(i,i+2));
-
-    const w=window.open('','_blank','width=1000,height=800');
+    const w=window.open('','_blank','width=1200,height=800');
     w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"/>');
     w.document.write(`<title>${apresNome} — Palco Sankyu</title>`);
     w.document.write(`<style>
       @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Serif:wght@400;600;700&display=swap');
       *{box-sizing:border-box;margin:0;padding:0}
       body{background:#fff;font-family:'Noto Serif',serif;color:#111}
-      .page{width:210mm;min-height:297mm;padding:10mm 12mm;display:block;page-break-after:always}
+      @page{size:A4 landscape;margin:0}
+      .page{width:297mm;height:210mm;padding:8mm 10mm;display:flex;flex-direction:column;gap:3mm;page-break-after:always;overflow:hidden}
       .page:last-child{page-break-after:avoid}
-      .page-content{display:flex;flex-direction:column;gap:5mm;height:calc(297mm - 20mm - 25mm)}
-      .doc-header{display:flex;align-items:center;justify-content:space-between;padding-bottom:5mm;border-bottom:3px solid #16404D;margin-bottom:2mm}
+      .doc-header{display:flex;align-items:center;justify-content:space-between;padding-bottom:4mm;border-bottom:3px solid #16404D;flex-shrink:0}
       .doc-header-left{display:flex;align-items:center;gap:10px}
-      .doc-header img{height:38px;width:auto}
-      .school{font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:#16404D;font-family:'DM Mono',monospace;margin-bottom:2px}
-      .apres-nome{font-size:17px;font-weight:700;color:#111}
+      .doc-header img{height:32px;width:auto}
+      .school{font-size:7px;letter-spacing:.18em;text-transform:uppercase;color:#16404D;font-family:'DM Mono',monospace;margin-bottom:2px}
+      .apres-nome{font-size:15px;font-weight:700;color:#111}
       .doc-header-info{text-align:right}
-      .info-line{font-size:9px;color:#666;font-family:'DM Mono',monospace;margin-bottom:2px}
-      .page-num{font-size:9px;color:#aaa;font-family:'DM Mono',monospace}
-      .music-block{flex:1;display:flex;flex-direction:column;min-height:0;break-inside:avoid;page-break-inside:avoid}
-      .music-header{display:flex;align-items:center;gap:6px;margin-bottom:2mm;padding-bottom:2mm;border-bottom:1px solid #e8e4d8;break-after:avoid;page-break-after:avoid}
+      .info-line{font-size:8px;color:#666;font-family:'DM Mono',monospace;margin-bottom:2px}
+      .page-num{font-size:8px;color:#aaa;font-family:'DM Mono',monospace}
+      .music-header{display:flex;align-items:center;gap:6px;margin-bottom:2mm;padding-bottom:2mm;border-bottom:1px solid #e8e4d8;flex-shrink:0}
       .music-order{font-size:9px;color:#fff;font-family:'DM Mono',monospace;font-weight:600;background:#16404D;border-radius:10px;padding:2px 8px;flex-shrink:0}
-      .music-nome{font-size:13px;font-weight:700;color:#16404D;flex:1}
+      .music-nome{font-size:14px;font-weight:700;color:#16404D;flex:1}
       .music-dur{font-size:9px;color:#aaa;font-family:'DM Mono',monospace;flex-shrink:0}
-      .stage-wrap{border:1px solid #ddd;border-radius:6px;overflow:hidden;background:#1a1a1d;flex:1}
-      .stage-wrap img{width:100%;display:block}
-      .legend{display:flex;flex-wrap:wrap;gap:3px;margin-top:2mm}
-      .legend-item{display:flex;align-items:center;gap:4px;background:#f5f4f0;border:1px solid #e0ddd5;border-radius:14px;padding:2px 8px 2px 3px;font-size:9px}
-      .lc{width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;color:#fff;flex-shrink:0;font-family:'DM Mono',monospace}
+      .stage-wrap{flex:1;min-height:0;border:1px solid #ddd;border-radius:6px;overflow:hidden;background:#1a1a1d;display:flex;align-items:stretch}
+      .stage-wrap img{width:100%;height:100%;object-fit:contain;display:block}
+      .legend{display:flex;flex-wrap:wrap;gap:3px;margin-top:2mm;flex-shrink:0}
+      .legend-item{display:flex;align-items:center;gap:4px;background:#f5f4f0;border:1px solid #e0ddd5;border-radius:14px;padding:2px 8px 2px 3px;font-size:8px}
+      .lc{width:14px;height:14px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:6px;font-weight:700;color:#fff;flex-shrink:0;font-family:'DM Mono',monospace}
       .ln{font-weight:600;color:#222}
       .li{color:#888}
-      .divider{border:none;border-top:1px dashed #ddd;margin:3mm 0;flex-shrink:0}
-      @media print{.page{page-break-after:always}.page:last-child{page-break-after:avoid}}
+      @media print{@page{size:A4 landscape;margin:0}.page{page-break-after:always}.page:last-child{page-break-after:avoid}}
     </style></head><body>`);
 
-    pdfPages.forEach((pair,pi)=>{
-      w.document.write('<div class="page">');
-      w.document.write(`<div class="doc-header">
-        <div class="doc-header-left">
-          <img src="${LOGO_B64}" alt="Sankyu"/>
-          <div>
-            <div class="school">Escola de Música Japonesa</div>
-            <div class="apres-nome">${apresNome}</div>
-          </div>
-        </div>
-        <div class="doc-header-info">
-          ${apresInfo?`<div class="info-line">${apresInfo}</div>`:''}
-          <div class="page-num">Página ${pi+1} de ${pdfPages.length} · ${totalMusicas} músicas</div>
-        </div>
-      </div>`);
+    // 1 música por página
+    pages.forEach(({canvas,musica,num},pi)=>{
+      const dataUrl=canvas.toDataURL('image/png');
+      const pessoas=(musica.elementos||[]).filter(e=>e.type==='pessoa');
+      const dur=musica.duracao?fmtDur(musica.duracao):'';
+      const legendHtml=pessoas.map(e=>{
+        const instrLabel=[e.instrumento,e.acessorio||''].filter(Boolean).join(' c/ ');
+        return `<div class="legend-item">
+          <div class="lc" style="background:${e.cor||'#5bafd6'}">${getInitials(e.nome)}</div>
+          <span class="ln">${e.nome}</span>
+          ${instrLabel?`<span class="li">— ${instrLabel}</span>`:''}
+        </div>`;
+      }).join('');
 
-      w.document.write('<div style="display:flex;flex-direction:column;gap:5mm;flex:1">');
-
-      pair.forEach(({canvas,musica,num},idx)=>{
-        if(idx===1) w.document.write('<hr class="divider"/>');
-        const dataUrl=canvas.toDataURL('image/png');
-        const pessoas=(musica.elementos||[]).filter(e=>e.type==='pessoa');
-        const dur=musica.duracao?fmtDur(musica.duracao):'';
-        const legendHtml=pessoas.map(e=>{
-          const instrLabel=[e.instrumento,e.acessorio||''].filter(Boolean).join(' c/ ');
-          return `<div class="legend-item">
-            <div class="lc" style="background:${e.cor||'#5bafd6'}">${getInitials(e.nome)}</div>
-            <span class="ln">${e.nome}</span>
-            ${instrLabel?`<span class="li">— ${instrLabel}</span>`:''}
-          </div>`;
-        }).join('');
-
-        // keep-together wrapper prevents header from splitting from image
-        w.document.write(`<div style="break-inside:avoid;page-break-inside:avoid;flex:1;display:flex;flex-direction:column">
-          <div class="music-block">
-            <div class="music-header">
-              <span class="music-order">${num} / ${totalMusicas}</span>
-              <span class="music-nome">${musica.nome}</span>
-              ${dur?`<span class="music-dur">⏱ ${dur}</span>`:''}
+      w.document.write(`<div class="page">
+        <div class="doc-header">
+          <div class="doc-header-left">
+            <img src="${LOGO_B64}" alt="Sankyu"/>
+            <div>
+              <div class="school">Escola de Música Japonesa</div>
+              <div class="apres-nome">${apresNome}</div>
             </div>
-            <div class="stage-wrap"><img src="${dataUrl}"/></div>
-            ${legendHtml?`<div class="legend">${legendHtml}</div>`:''}
-            ${musica.obs?`<div style="font-size:9px;color:#888;margin-top:2mm;font-style:italic">${musica.obs}</div>`:''}
           </div>
-        </div>`);
-      });
-
-      w.document.write('</div>'); // flex container
-      w.document.write('</div>'); // .page
-    }); // end pdfPages.forEach
+          <div class="doc-header-info">
+            ${apresInfo?`<div class="info-line">${apresInfo}</div>`:''}
+            <div class="page-num">Música ${num} de ${totalMusicas}${dur?' · ⏱ '+dur:''}</div>
+          </div>
+        </div>
+        <div class="music-header">
+          <span class="music-order">${num} / ${totalMusicas}</span>
+          <span class="music-nome">${musica.nome}</span>
+          ${dur?`<span class="music-dur">⏱ ${dur}</span>`:''}
+        </div>
+        <div class="stage-wrap"><img src="${dataUrl}"/></div>
+        ${legendHtml?`<div class="legend">${legendHtml}</div>`:''}
+        ${musica.obs?`<div style="font-size:8px;color:#888;margin-top:1mm;font-style:italic">${musica.obs}</div>`:''}
+      </div>`);
+    }); // end pages.forEach
 
     w.document.write('</body></html>');
     w.document.close();
