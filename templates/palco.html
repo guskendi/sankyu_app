@@ -1601,8 +1601,9 @@ async function exportPDF(){
       @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Serif:wght@400;600;700&display=swap');
       *{box-sizing:border-box;margin:0;padding:0}
       body{background:#fff;font-family:'Noto Serif',serif;color:#111}
-      .page{width:210mm;min-height:297mm;padding:10mm 12mm;display:flex;flex-direction:column;gap:5mm;page-break-after:always}
+      .page{width:210mm;min-height:297mm;padding:10mm 12mm;display:block;page-break-after:always}
       .page:last-child{page-break-after:avoid}
+      .page-content{display:flex;flex-direction:column;gap:5mm;height:calc(297mm - 20mm - 25mm)}
       .doc-header{display:flex;align-items:center;justify-content:space-between;padding-bottom:5mm;border-bottom:3px solid #16404D;margin-bottom:2mm}
       .doc-header-left{display:flex;align-items:center;gap:10px}
       .doc-header img{height:38px;width:auto}
@@ -1611,8 +1612,8 @@ async function exportPDF(){
       .doc-header-info{text-align:right}
       .info-line{font-size:9px;color:#666;font-family:'DM Mono',monospace;margin-bottom:2px}
       .page-num{font-size:9px;color:#aaa;font-family:'DM Mono',monospace}
-      .music-block{flex:1;display:flex;flex-direction:column;min-height:0}
-      .music-header{display:flex;align-items:center;gap:6px;margin-bottom:2mm;padding-bottom:2mm;border-bottom:1px solid #e8e4d8}
+      .music-block{flex:1;display:flex;flex-direction:column;min-height:0;break-inside:avoid;page-break-inside:avoid}
+      .music-header{display:flex;align-items:center;gap:6px;margin-bottom:2mm;padding-bottom:2mm;border-bottom:1px solid #e8e4d8;break-after:avoid;page-break-after:avoid}
       .music-order{font-size:9px;color:#fff;font-family:'DM Mono',monospace;font-weight:600;background:#16404D;border-radius:10px;padding:2px 8px;flex-shrink:0}
       .music-nome{font-size:13px;font-weight:700;color:#16404D;flex:1}
       .music-dur{font-size:9px;color:#aaa;font-family:'DM Mono',monospace;flex-shrink:0}
@@ -1643,6 +1644,8 @@ async function exportPDF(){
         </div>
       </div>`);
 
+      w.document.write('<div style="display:flex;flex-direction:column;gap:5mm;flex:1">');
+
       pair.forEach(({canvas,musica,num},idx)=>{
         if(idx===1) w.document.write('<hr class="divider"/>');
         const dataUrl=canvas.toDataURL('image/png');
@@ -1657,20 +1660,23 @@ async function exportPDF(){
           </div>`;
         }).join('');
 
-        w.document.write(`<div class="music-block">
-          <div class="music-header">
-            <span class="music-order">${num} / ${totalMusicas}</span>
-            <span class="music-nome">${musica.nome}</span>
-            ${dur?`<span class="music-dur">⏱ ${dur}</span>`:''}
+        // keep-together wrapper prevents header from splitting from image
+        w.document.write(`<div style="break-inside:avoid;page-break-inside:avoid;flex:1;display:flex;flex-direction:column">
+          <div class="music-block">
+            <div class="music-header">
+              <span class="music-order">${num} / ${totalMusicas}</span>
+              <span class="music-nome">${musica.nome}</span>
+              ${dur?`<span class="music-dur">⏱ ${dur}</span>`:''}
+            </div>
+            <div class="stage-wrap"><img src="${dataUrl}"/></div>
+            ${legendHtml?`<div class="legend">${legendHtml}</div>`:''}
+            ${musica.obs?`<div style="font-size:9px;color:#888;margin-top:2mm;font-style:italic">${musica.obs}</div>`:''}
           </div>
-          <div class="stage-wrap"><img src="${dataUrl}"/></div>
-          ${legendHtml?`<div class="legend">${legendHtml}</div>`:''}
-          ${musica.obs?`<div style="font-size:9px;color:#888;margin-top:2mm;font-style:italic">${musica.obs}</div>`:''}
         </div>`);
       });
 
-      w.document.write('</div>');
-    });
+      w.document.write('</div>'); // flex container
+      w.document.write('</div>'); // .page
 
     w.document.write('</body></html>');
     w.document.close();
