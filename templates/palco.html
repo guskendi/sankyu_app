@@ -1685,17 +1685,35 @@ async function exportPDF(){
 function drawElementOnCtx(cx, el, isSelected, scale){
   const x=el.x*scale, y=el.y*scale;
   const r=el.r||22, sr=r*scale;
+  const acc=el.acessorio||'';
   cx.save();
+
   if(el.type==='pessoa'){
+    // Accessory badge behind circle
+    if(acc){
+      const accIcon=_accIcon(acc);
+      const badgeR=sr*0.45;
+      const bx=x+sr*0.65, by=y+sr*0.65;
+      cx.beginPath(); cx.arc(bx,by,badgeR,0,Math.PI*2);
+      cx.fillStyle='#1e1e22'; cx.fill();
+      cx.strokeStyle='#555'; cx.lineWidth=1; cx.stroke();
+      cx.font=`${Math.round(badgeR*1.2)}px sans-serif`;
+      cx.textAlign='center'; cx.textBaseline='middle';
+      cx.fillText(accIcon,bx,by);
+    }
+    // Circle
     cx.beginPath(); cx.arc(x,y,sr,0,Math.PI*2);
     cx.fillStyle=el.cor||'#5bafd6'; cx.fill();
+    // Initials
     cx.font=`bold ${Math.round(sr*0.55)}px DM Mono,monospace`;
     cx.fillStyle='#fff'; cx.textAlign='center'; cx.textBaseline='middle';
     cx.fillText(getInitials(el.nome),x,y);
+    // Name
     cx.font=`${Math.round(9*scale)}px Noto Serif,serif`;
     cx.fillStyle='#ccc'; cx.textAlign='center'; cx.textBaseline='top';
     cx.fillText(shortName(el.nome),x,y+sr+3*scale);
-    const instrLabel=[el.instrumento, el.acessorio||''].filter(Boolean).join(' c/ ');
+    // Instrument + accessory
+    const instrLabel=[el.instrumento, acc].filter(Boolean).join(' c/ ');
     if(instrLabel){
       cx.font=`${Math.round(8*scale)}px DM Mono,monospace`;
       cx.fillStyle=el.cor||'#5bafd6';
@@ -1703,15 +1721,33 @@ function drawElementOnCtx(cx, el, isSelected, scale){
     }
   } else {
     const hw=sr*0.9;
+    // Box
     cx.beginPath(); roundRect(cx,x-hw,y-hw,hw*2,hw*2,6*scale);
     cx.fillStyle='#1e1e22'; cx.fill();
-    cx.strokeStyle=EQUIP_COLORS[el.type]||'#555'; cx.lineWidth=1.5; cx.stroke();
-    cx.font=`${Math.round(sr*1.1)}px sans-serif`;
-    cx.textAlign='center'; cx.textBaseline='middle';
-    cx.fillText(EQUIP_ICONS[el.type]||'?',x,y);
+    cx.strokeStyle=EQUIP_COLORS[el.type]||'#555'; cx.lineWidth=1.5*scale; cx.stroke();
+    // Vectorial icon — temporarily swap SCALE for scale
+    const savedSCALE=SCALE; SCALE=scale;
+    _drawEquipIcon(cx, el.type, x, y, hw, false);
+    SCALE=savedSCALE;
+    // Combined label with accessory
+    const combinedLabel=acc
+      ?`${el.label||EQUIP_LABELS[el.type]||el.type} ${acc}`
+      :(el.label||EQUIP_LABELS[el.type]||el.type);
     cx.font=`${Math.round(8*scale)}px DM Mono,monospace`;
     cx.fillStyle='#888'; cx.textAlign='center'; cx.textBaseline='top';
-    cx.fillText(el.label||EQUIP_LABELS[el.type]||el.type,x,y+hw+3*scale);
+    cx.fillText(combinedLabel,x,y+hw+3*scale);
+    // Accessory badge on corner
+    if(acc){
+      const accIcon=_accIcon(acc);
+      const badgeR=sr*0.4;
+      const bx=x+hw*0.7, by=y-hw*0.7;
+      cx.beginPath(); cx.arc(bx,by,badgeR,0,Math.PI*2);
+      cx.fillStyle='#1e1e22'; cx.fill();
+      cx.strokeStyle=EQUIP_COLORS[el.type]||'#555'; cx.lineWidth=1; cx.stroke();
+      cx.font=`${Math.round(badgeR*1.2)}px sans-serif`;
+      cx.textAlign='center'; cx.textBaseline='middle';
+      cx.fillText(accIcon,bx,by);
+    }
   }
   cx.restore();
 }
