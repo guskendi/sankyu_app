@@ -1875,6 +1875,14 @@ async function exportPDF(){
             h+='</div>';
             cols[ci%2].push(h); ci++;
           });
+          // Add extras column
+          const extras=(window._invExtras&&window._invExtras['inv_extras_'+curApres.id]||[]).filter(e=>e.qty>0&&e.nome.trim());
+          if(extras.length){
+            let h='<div style="margin-bottom:6px"><div style="font-size:7px;font-weight:700;color:#16404D;font-family:DM Mono,monospace;letter-spacing:.1em;text-transform:uppercase;margin-bottom:3px;padding-bottom:2px;border-bottom:1px solid #e0ddd5">🗂 Bases e Extras</div>';
+            h+=extras.map(it=>'<div style="display:flex;align-items:center;gap:5px;padding:2px 0;border-bottom:1px solid #f5f4f0"><div style="background:#2a6070;border-radius:3px;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;font-family:DM Mono,monospace">'+it.qty+'</div><div style="font-size:9px;color:#222;font-weight:500">'+it.nome+'</div></div>').join('');
+            h+='</div>';
+            cols[ci%2].push(h);
+          }
           return '<div>'+cols[0].join('')+'</div><div>'+cols[1].join('')+'</div>';
         })()}
       </div>
@@ -2128,8 +2136,74 @@ function openInventario(){
   });
   if(!any) html='<div style="text-align:center;padding:32px;color:#555;font-style:italic">Nenhum elemento posicionado ainda.</div>';
 
+  // ── Itens extras (bases e outros) ─────────────────────────────────────────
+  const BASES_PRESET=[
+    'Base Naname','Base Tatte','Base Shime Alta','Base Shime Chão','Base Suspensa','Base Yoko'
+  ];
+  const extrasKey='inv_extras_'+curApres.id;
+  if(!window._invExtras) window._invExtras={};
+  if(!window._invExtras[extrasKey]){
+    // Init with presets qty=0
+    window._invExtras[extrasKey]=BASES_PRESET.map(nome=>({nome,qty:0}));
+  }
+
+  html+=`<div style="margin-top:18px;padding-top:14px;border-top:1px solid #1e1e22">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="font-size:10px;font-weight:600;color:#8b7cf6;font-family:'DM Mono',monospace;letter-spacing:.1em;text-transform:uppercase">🗂 Bases e Extras</div>
+      <button onclick="invAddExtra()" style="background:none;border:1px solid #2a2a2e;border-radius:6px;padding:3px 10px;font-size:10px;color:#888;cursor:pointer;font-family:'DM Mono',monospace">+ Item</button>
+    </div>
+    <div id="inv-extras-list"></div>
+  </div>`;
+
   document.getElementById('inv-body').innerHTML=html;
+  renderInvExtras();
   document.getElementById('m-inv').style.display='flex';
+}
+
+function renderInvExtras(){
+  if(!curApres) return;
+  const extrasKey='inv_extras_'+curApres.id;
+  const extras=window._invExtras[extrasKey]||[];
+  const el=document.getElementById('inv-extras-list');
+  if(!el) return;
+  el.innerHTML=extras.map((item,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #151518">
+      <input type="number" min="0" max="99" value="${item.qty}"
+        oninput="invSetQty(${i},this.value)"
+        style="width:52px;text-align:center;background:#1a1628;border:1px solid #5c4db1;border-radius:6px;padding:4px;font-size:13px;font-weight:700;color:#9b7cf6;font-family:'DM Mono',monospace"/>
+      <input type="text" value="${item.nome}"
+        oninput="invSetNome(${i},this.value)"
+        style="flex:1;background:#111113;border:1px solid #1e1e22;border-radius:6px;padding:5px 8px;font-size:12px;color:#e0ddd5"/>
+      <button onclick="invRemoveExtra(${i})" style="background:none;border:none;color:#444;font-size:13px;cursor:pointer;padding:2px 6px" title="Remover">✕</button>
+    </div>`).join('');
+}
+
+function invSetQty(i,val){
+  if(!curApres) return;
+  const k='inv_extras_'+curApres.id;
+  window._invExtras[k][i].qty=parseInt(val)||0;
+}
+function invSetNome(i,val){
+  if(!curApres) return;
+  const k='inv_extras_'+curApres.id;
+  window._invExtras[k][i].nome=val;
+}
+function invRemoveExtra(i){
+  if(!curApres) return;
+  const k='inv_extras_'+curApres.id;
+  window._invExtras[k].splice(i,1);
+  renderInvExtras();
+}
+function invAddExtra(){
+  if(!curApres) return;
+  const k='inv_extras_'+curApres.id;
+  window._invExtras[k].push({nome:'',qty:0});
+  renderInvExtras();
+  // focus last input
+  setTimeout(()=>{
+    const inputs=document.querySelectorAll('#inv-extras-list input[type="text"]');
+    if(inputs.length) inputs[inputs.length-1].focus();
+  },50);
 }
 
 // Init
