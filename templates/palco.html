@@ -458,6 +458,7 @@ function initResizeHandles(){
 
 function draw(animEls=null){
   const els=animEls||elementos;
+  if(!animEls && els.length>0) console.log('[draw] elements:', els.length, els.map(e=>e.type));
   ctx.clearRect(0,0,canvas.width,canvas.height);
   const W=canvas.width, H=canvas.height;
 
@@ -1553,6 +1554,7 @@ function loadMusica(idx){
   if(!curMusicas[idx]) return;
   curMusicaId=curMusicas[idx].id;
   elementos=JSON.parse(JSON.stringify(curMusicas[idx].elementos||[]));
+  console.log('[loadMusica] idx='+idx+' elementos='+elementos.length, JSON.stringify(elementos.slice(0,2)));
   selected=null; selectedSet=new Set(); lasso=null;
   hideInspector();
   setupCanvas();
