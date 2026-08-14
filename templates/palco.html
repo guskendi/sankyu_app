@@ -797,22 +797,20 @@ function drawElement(el, isSelected){
   }
 
   const r=el.r||22;
-  const sr=r*SCALE;
+  const rot=(el.rotation||0)*Math.PI/180;
 
   ctx.save();
-  // Apply rotation if set
-  if(el.rotation){
-    ctx.translate(x, y);
-    ctx.rotate(el.rotation * Math.PI / 180);
-    ctx.translate(-x, -y);
-  }
   if(isSelected){
     ctx.shadowColor='#8b7cf6';
     ctx.shadowBlur=12;
   }
 
   if(el.type==='pessoa'){
-    // Draw accessory badge behind if present
+    // ── Draw rotated icon part ─────────────────────────────────────────────
+    ctx.save();
+    if(rot){ ctx.translate(x,y); ctx.rotate(rot); ctx.translate(-x,-y); }
+
+    // Accessory badge
     if(acc){
       const accIcon=_accIcon(acc);
       const badgeR=sr*0.45;
@@ -832,21 +830,19 @@ function drawElement(el, isSelected){
     ctx.fill();
     if(isSelected){ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();}
 
-    // Initials
+    // Initials (inside circle — rotate with icon)
     ctx.font=`bold ${Math.round(sr*0.55)}px DM Mono, monospace`;
     ctx.fillStyle='#fff';
-    ctx.textAlign='center';
-    ctx.textBaseline='middle';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.fillText(getInitials(el.nome),x,y);
+    ctx.restore(); // end rotation
 
-    // Name below
+    // ── Labels always upright ──────────────────────────────────────────────
     ctx.font=`${Math.round(9*SCALE)}px Noto Serif, serif`;
     ctx.fillStyle='#ccc';
-    ctx.textAlign='center';
-    ctx.textBaseline='top';
+    ctx.textAlign='center'; ctx.textBaseline='top';
     ctx.fillText(shortName(el.nome),x,y+sr+3*SCALE);
 
-    // Instrument + accessory label
     const instrLabel=[el.instrumento, acc].filter(Boolean).join(' c/ ');
     if(instrLabel){
       ctx.font=`${Math.round(8*SCALE)}px DM Mono, monospace`;
@@ -856,18 +852,20 @@ function drawElement(el, isSelected){
   } else {
     // Equipment — rounded square
     const hw=sr*0.9;
+
+    // ── Draw rotated icon part ─────────────────────────────────────────────
+    ctx.save();
+    if(rot){ ctx.translate(x,y); ctx.rotate(rot); ctx.translate(-x,-y); }
+
     ctx.beginPath();
     roundRect(ctx,x-hw,y-hw,hw*2,hw*2,6*SCALE);
-    ctx.fillStyle='#1e1e22';
-    ctx.fill();
+    ctx.fillStyle='#1e1e22'; ctx.fill();
     ctx.strokeStyle=EQUIP_COLORS[el.type]||'#555';
-    ctx.lineWidth=isSelected?2:1.5;
-    ctx.stroke();
+    ctx.lineWidth=isSelected?2:1.5; ctx.stroke();
 
-    // Icon — draw custom shape per type
     _drawEquipIcon(ctx, el.type, x, y, hw, isSelected);
 
-    // Accessory badge on corner
+    // Accessory badge
     if(acc){
       const accIcon=_accIcon(acc);
       const badgeR=sr*0.4;
@@ -879,8 +877,9 @@ function drawElement(el, isSelected){
       ctx.textAlign='center'; ctx.textBaseline='middle';
       ctx.fillText(accIcon,bx,by);
     }
+    ctx.restore(); // end rotation
 
-    // Combined label below
+    // ── Label always upright ───────────────────────────────────────────────
     const combinedLabel=acc?`${el.label||EQUIP_LABELS[el.type]||el.type} ${acc}`:(el.label||EQUIP_LABELS[el.type]||el.type);
     ctx.font=`${Math.round(8*SCALE)}px DM Mono, monospace`;
     ctx.fillStyle='#888';
@@ -2098,17 +2097,15 @@ function drawElementOnCtx(cx, el, isSelected, scale){
 
   const r=el.r||22, sr=r*scale;
   const acc=el.acessorio||'';
+  const rot=(el.rotation||0)*Math.PI/180;
   cx.save();
-  if(el.rotation){
-    cx.translate(x,y); cx.rotate(el.rotation*Math.PI/180); cx.translate(-x,-y);
-  }
 
   if(el.type==='pessoa'){
-    // Accessory badge behind circle
+    cx.save();
+    if(rot){ cx.translate(x,y); cx.rotate(rot); cx.translate(-x,-y); }
     if(acc){
       const accIcon=_accIcon(acc);
-      const badgeR=sr*0.45;
-      const bx=x+sr*0.65, by=y+sr*0.65;
+      const badgeR=sr*0.45, bx=x+sr*0.65, by=y+sr*0.65;
       cx.beginPath(); cx.arc(bx,by,badgeR,0,Math.PI*2);
       cx.fillStyle='#1e1e22'; cx.fill();
       cx.strokeStyle='#555'; cx.lineWidth=1; cx.stroke();
@@ -2116,19 +2113,17 @@ function drawElementOnCtx(cx, el, isSelected, scale){
       cx.textAlign='center'; cx.textBaseline='middle';
       cx.fillText(accIcon,bx,by);
     }
-    // Circle
     cx.beginPath(); cx.arc(x,y,sr,0,Math.PI*2);
     cx.fillStyle=el.cor||'#5bafd6'; cx.fill();
-    // Initials
     cx.font=`bold ${Math.round(sr*0.55)}px DM Mono,monospace`;
     cx.fillStyle='#fff'; cx.textAlign='center'; cx.textBaseline='middle';
     cx.fillText(getInitials(el.nome),x,y);
-    // Name
+    cx.restore();
+    // labels always upright
     cx.font=`${Math.round(9*scale)}px Noto Serif,serif`;
     cx.fillStyle='#ccc'; cx.textAlign='center'; cx.textBaseline='top';
     cx.fillText(shortName(el.nome),x,y+sr+3*scale);
-    // Instrument + accessory
-    const instrLabel=[el.instrumento, acc].filter(Boolean).join(' c/ ');
+    const instrLabel=[el.instrumento,acc].filter(Boolean).join(' c/ ');
     if(instrLabel){
       cx.font=`${Math.round(8*scale)}px DM Mono,monospace`;
       cx.fillStyle=el.cor||'#5bafd6';
@@ -2136,26 +2131,17 @@ function drawElementOnCtx(cx, el, isSelected, scale){
     }
   } else {
     const hw=sr*0.9;
-    // Box
+    cx.save();
+    if(rot){ cx.translate(x,y); cx.rotate(rot); cx.translate(-x,-y); }
     cx.beginPath(); roundRect(cx,x-hw,y-hw,hw*2,hw*2,6*scale);
     cx.fillStyle='#1e1e22'; cx.fill();
     cx.strokeStyle=EQUIP_COLORS[el.type]||'#555'; cx.lineWidth=1.5*scale; cx.stroke();
-    // Vectorial icon — temporarily swap SCALE for scale
     const savedSCALE=SCALE; SCALE=scale;
     _drawEquipIcon(cx, el.type, x, y, hw, false);
     SCALE=savedSCALE;
-    // Combined label with accessory
-    const combinedLabel=acc
-      ?`${el.label||EQUIP_LABELS[el.type]||el.type} ${acc}`
-      :(el.label||EQUIP_LABELS[el.type]||el.type);
-    cx.font=`${Math.round(8*scale)}px DM Mono,monospace`;
-    cx.fillStyle='#888'; cx.textAlign='center'; cx.textBaseline='top';
-    cx.fillText(combinedLabel,x,y+hw+3*scale);
-    // Accessory badge on corner
     if(acc){
       const accIcon=_accIcon(acc);
-      const badgeR=sr*0.4;
-      const bx=x+hw*0.7, by=y-hw*0.7;
+      const badgeR=sr*0.4, bx=x+hw*0.7, by=y-hw*0.7;
       cx.beginPath(); cx.arc(bx,by,badgeR,0,Math.PI*2);
       cx.fillStyle='#1e1e22'; cx.fill();
       cx.strokeStyle=EQUIP_COLORS[el.type]||'#555'; cx.lineWidth=1; cx.stroke();
@@ -2163,10 +2149,14 @@ function drawElementOnCtx(cx, el, isSelected, scale){
       cx.textAlign='center'; cx.textBaseline='middle';
       cx.fillText(accIcon,bx,by);
     }
+    cx.restore();
+    const combinedLabel=acc?`${el.label||EQUIP_LABELS[el.type]||el.type} ${acc}`:(el.label||EQUIP_LABELS[el.type]||el.type);
+    cx.font=`${Math.round(8*scale)}px DM Mono,monospace`;
+    cx.fillStyle='#888'; cx.textAlign='center'; cx.textBaseline='top';
+    cx.fillText(combinedLabel,x,y+hw+3*scale);
   }
   cx.restore();
 }
-
 // ── Utilities ─────────────────────────────────────────────────────────────────
 function closeModal(id){document.getElementById(id).style.display='none';}
 
