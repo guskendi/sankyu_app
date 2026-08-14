@@ -1797,7 +1797,8 @@ async function exportPDF(){
         if(['grupo','texto'].includes(e.type)) return;
         let key,label,cat;
         if(e.type==='pessoa'){
-          const instr=e.instrumento||'(sem instrumento)';
+          const instr=e.instrumento||'';
+          if(!instr) return; // skip sem instrumento
           const acc=e.acessorio||'';
           key='p:'+instr+(acc?'+'+acc:'');
           label=instr+(acc?' c/ '+acc:'');
@@ -1842,34 +1843,42 @@ async function exportPDF(){
     });
 
     // Write cover page
-    w.document.write(`<div class="page" style="justify-content:space-between">
-      <div>
-        <div style="display:flex;align-items:center;gap:14px;padding-bottom:6mm;border-bottom:3px solid #16404D;margin-bottom:6mm">
-          <img src="${LOGO_B64}" style="height:48px;width:auto"/>
-          <div>
-            <div style="font-size:8px;letter-spacing:.2em;text-transform:uppercase;color:#16404D;font-family:'DM Mono',monospace;margin-bottom:4px">Escola de Música Japonesa</div>
-            <div style="font-size:22px;font-weight:700;color:#111">${apresNome}</div>
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4mm;margin-bottom:6mm">
-          ${curApres.local?`<div><div style="font-size:8px;color:#aaa;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px">Local</div><div style="font-size:12px;font-weight:600;color:#222">${curApres.local}</div></div>`:''}
-          ${curApres.data?`<div><div style="font-size:8px;color:#aaa;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px">Data</div><div style="font-size:12px;font-weight:600;color:#222">${fmtDate(curApres.data)}</div></div>`:''}
-          <div><div style="font-size:8px;color:#aaa;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px">Total de músicas</div><div style="font-size:12px;font-weight:600;color:#222">${totalMusicas}</div></div>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:3mm;margin-bottom:6mm">
-          ${[['🎵 Instr.',totP,'#16404D'],['🥁 Taiko',totT,'#c0392b'],['🔊 Som',totE,'#1565a8'],['🪑 Mob.',totM,'#2e7d4f']].map(([l,n,c])=>`
-          <div style="background:#f8f7f5;border:1px solid #e0ddd5;border-radius:6px;padding:6px;text-align:center">
-            <div style="font-size:20px;font-weight:700;color:${c};font-family:'DM Mono',monospace">${n}</div>
-            <div style="font-size:8px;color:#888;margin-top:2px">${l}</div>
-          </div>`).join('')}
-        </div>
-        <div style="font-size:9px;font-weight:700;color:#16404D;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4mm;font-family:'DM Mono',monospace">Inventário de Materiais</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4mm">
-          ${Object.entries(catsPDF).filter(([,items])=>items.length).map(([cat,items],i)=>`
-          <div>${invHtml.match(new RegExp('<div style="margin-bottom:10px">[\\s\\S]*?</div>\\s*</div>','g'))?.[i]||''}</div>`).join('')}
+    w.document.write(`<div class="page" style="overflow:hidden">
+      <div style="display:flex;align-items:center;gap:14px;padding-bottom:5mm;border-bottom:3px solid #16404D;margin-bottom:5mm;flex-shrink:0">
+        <img src="${LOGO_B64}" style="height:42px;width:auto"/>
+        <div>
+          <div style="font-size:8px;letter-spacing:.2em;text-transform:uppercase;color:#16404D;font-family:DM Mono,monospace;margin-bottom:3px">Escola de Música Japonesa</div>
+          <div style="font-size:20px;font-weight:700;color:#111">${apresNome}</div>
         </div>
       </div>
-      <div style="text-align:right;font-size:8px;color:#ccc;font-family:'DM Mono',monospace;border-top:1px solid #e0ddd5;padding-top:3mm">Posicionamento de Palco · Sankyu · ${apresNome}</div>
+      <div style="display:flex;gap:10mm;margin-bottom:5mm;flex-shrink:0">
+        ${curApres.local?`<div><div style="font-size:7px;color:#aaa;font-family:DM Mono,monospace;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px">Local</div><div style="font-size:12px;font-weight:600;color:#222">${curApres.local}</div></div>`:''}
+        ${curApres.data?`<div><div style="font-size:7px;color:#aaa;font-family:DM Mono,monospace;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px">Data</div><div style="font-size:12px;font-weight:600;color:#222">${fmtDate(curApres.data)}</div></div>`:''}
+        <div><div style="font-size:7px;color:#aaa;font-family:DM Mono,monospace;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px">Total de músicas</div><div style="font-size:12px;font-weight:600;color:#222">${totalMusicas}</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:3mm;margin-bottom:5mm;flex-shrink:0">
+        ${[['🎵 Instr.',totP,'#16404D'],['🥁 Taiko',totT,'#c0392b'],['🔊 Som',totE,'#1565a8'],['🪑 Mob.',totM,'#2e7d4f']].map(([l,n,col])=>`
+        <div style="background:#f8f7f5;border:1px solid #e0ddd5;border-radius:6px;padding:5px;text-align:center">
+          <div style="font-size:18px;font-weight:700;color:${col};font-family:DM Mono,monospace">${n}</div>
+          <div style="font-size:7px;color:#888;margin-top:2px">${l}</div>
+        </div>`).join('')}
+      </div>
+      <div style="font-size:8px;font-weight:700;color:#16404D;text-transform:uppercase;letter-spacing:.1em;margin-bottom:3mm;font-family:DM Mono,monospace;flex-shrink:0">Inventário de Materiais</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6mm;flex:1;min-height:0;overflow:hidden">
+        ${(()=>{
+          const cols=[[],[]]; let ci=0;
+          Object.entries(catsPDF).forEach(([cat,items])=>{
+            if(!items.length) return;
+            items.sort((a,b)=>a.label.localeCompare(b.label));
+            let h='<div style="margin-bottom:6px"><div style="font-size:7px;font-weight:700;color:#16404D;font-family:DM Mono,monospace;letter-spacing:.1em;text-transform:uppercase;margin-bottom:3px;padding-bottom:2px;border-bottom:1px solid #e0ddd5">'+( catLabelsPDF[cat]||cat)+'</div>';
+            h+=items.map(it=>'<div style="display:flex;align-items:center;gap:5px;padding:2px 0;border-bottom:1px solid #f5f4f0"><div style="background:#16404D;border-radius:3px;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;font-family:DM Mono,monospace">'+it.qty+'</div><div><div style="font-size:9px;color:#222;font-weight:500">'+it.label+'</div><div style="font-size:6px;color:#aaa;font-family:DM Mono,monospace">'+it.musicas.join(' · ')+'</div></div></div>').join('');
+            h+='</div>';
+            cols[ci%2].push(h); ci++;
+          });
+          return '<div>'+cols[0].join('')+'</div><div>'+cols[1].join('')+'</div>';
+        })()}
+      </div>
+      <div style="text-align:right;font-size:7px;color:#ccc;font-family:DM Mono,monospace;border-top:1px solid #e0ddd5;padding-top:2mm;margin-top:2mm;flex-shrink:0">Posicionamento de Palco · Sankyu · ${apresNome}</div>
     </div>`);
 
     // ── Páginas de músicas ────────────────────────────────────────────────────
@@ -2055,7 +2064,8 @@ function openInventario(){
       if(['grupo','texto'].includes(e.type)) return;
       let key,label,cat;
       if(e.type==='pessoa'){
-        const instr=e.instrumento||'(sem instrumento)';
+        const instr=e.instrumento||'';
+        if(!instr) return; // skip pessoas sem instrumento
         const acc=e.acessorio||'';
         key='p:'+instr+(acc?'+'+acc:'');
         label=instr+(acc?' c/ '+acc:'');
