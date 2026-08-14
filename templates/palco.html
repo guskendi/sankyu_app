@@ -488,11 +488,11 @@ function draw(animEls=null){
   ctx.fillText('PALCO', W/2, 12*SCALE);
 
   // Draw setas first (behind everything)
-  els.filter(el=>el.type==='seta').forEach(el=>drawElement(el, el===selected||selectedSet.has(el.id)));
+  els.filter(el=>el.type==='seta').forEach(el=>{ try{ drawElement(el, el===selected||selectedSet.has(el.id)); }catch(e){ console.warn('draw seta err',e); } });
   // Draw grupos (behind people but above setas)
-  els.filter(el=>el.type==='grupo').forEach(el=>drawElement(el, el===selected||selectedSet.has(el.id)));
+  els.filter(el=>el.type==='grupo').forEach(el=>{ try{ drawElement(el, el===selected||selectedSet.has(el.id)); }catch(e){ console.warn('draw grupo err',e); } });
   // Draw remaining elements on top
-  els.filter(el=>el.type!=='grupo'&&el.type!=='seta').forEach(el=>drawElement(el, el===selected||selectedSet.has(el.id)));
+  els.filter(el=>el.type!=='grupo'&&el.type!=='seta').forEach(el=>{ try{ drawElement(el, el===selected||selectedSet.has(el.id)); }catch(e){ console.warn('draw el err',el.type,e); } });
 
   // Draw lasso rect
   if(lasso){
@@ -746,6 +746,7 @@ function drawElement(el, isSelected){
 
   // ── Seta ──────────────────────────────────────────────────────────────────
   if(el.type==='seta'){
+    if(el.x1===undefined) return; // guard against malformed seta
     const x1=el.x1*SCALE, y1=el.y1*SCALE;
     const x2=el.x2*SCALE, y2=el.y2*SCALE;
     const cx=el.cx*SCALE,  cy=el.cy*SCALE;
@@ -1165,6 +1166,7 @@ function hitTest(x,y){
       const onEdge=(x<el.x-w/2+8||x>el.x+w/2-8||y<el.y-h/2+8||y>el.y+h/2-8);
       if(inX&&inY&&(onEdge || el===selected)) return {el,resize:false};
     } else if(el.type==='seta'){
+      if(el.x1===undefined) continue; // malformed seta
       if(el===selected){
         const pts=[{px:el.x1,py:el.y1,pt:'start'},{px:el.x2,py:el.y2,pt:'end'},{px:el.cx,py:el.cy,pt:'ctrl'}];
         for(const p of pts){ if(Math.hypot(x-p.px,y-p.py)<10) return {el,pt:p.pt}; }
