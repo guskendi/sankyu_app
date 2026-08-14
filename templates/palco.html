@@ -1856,8 +1856,8 @@ async function exportPDF(){
         ${curApres.data?`<div><div style="font-size:7px;color:#aaa;font-family:DM Mono,monospace;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px">Data</div><div style="font-size:12px;font-weight:600;color:#222">${fmtDate(curApres.data)}</div></div>`:''}
         <div><div style="font-size:7px;color:#aaa;font-family:DM Mono,monospace;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px">Total de músicas</div><div style="font-size:12px;font-weight:600;color:#222">${totalMusicas}</div></div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:3mm;margin-bottom:5mm;flex-shrink:0">
-        ${[['🎵 Instr.',totP,'#16404D'],['🥁 Taiko',totT,'#c0392b'],['🔊 Som',totE,'#1565a8'],['🪑 Mob.',totM,'#2e7d4f']].map(([l,n,col])=>`
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:3mm;margin-bottom:5mm;flex-shrink:0">
+        ${[['🎵 Instr.',totP,'#16404D'],['🥁 Taiko',totT,'#c0392b'],['🔊 Som',totE,'#1565a8'],['🪑 Mob.',totM,'#2e7d4f'],['🗂 Bases',(window._invExtras&&window._invExtras['inv_extras_'+curApres.id]||[]).reduce((s,e)=>s+(parseInt(e.qty)||0),0),'#2a6070']].map(([l,n,col])=>`
         <div style="background:#f8f7f5;border:1px solid #e0ddd5;border-radius:6px;padding:5px;text-align:center">
           <div style="font-size:18px;font-weight:700;color:${col};font-family:DM Mono,monospace">${n}</div>
           <div style="font-size:7px;color:#888;margin-top:2px">${l}</div>
@@ -2106,15 +2106,23 @@ function openInventario(){
   const totalTaiko=Object.entries(maxCounts).filter(([k])=>keyInfo[k]?.cat==='taiko').reduce((s,[,v])=>s+v,0);
   const totalEquip=Object.entries(maxCounts).filter(([k])=>keyInfo[k]?.cat==='equipamento').reduce((s,[,v])=>s+v,0);
   const totalMob=Object.entries(maxCounts).filter(([k])=>keyInfo[k]?.cat==='mobiliário').reduce((s,[,v])=>s+v,0);
-  const totalGeral=totalPessoas+totalTaiko+totalEquip+totalMob;
+  const extrasKey='inv_extras_'+curApres.id;
+  if(!window._invExtras) window._invExtras={};
+  if(!window._invExtras[extrasKey]){
+    const BASES_PRESET=['Base Naname','Base Tatte','Base Shime Alta','Base Shime Chão','Base Suspensa','Base Yoko'];
+    window._invExtras[extrasKey]=BASES_PRESET.map(nome=>({nome,qty:0}));
+  }
+  const totalExtras=(window._invExtras[extrasKey]||[]).reduce((s,e)=>s+(parseInt(e.qty)||0),0);
+  const totalGeral=totalPessoas+totalTaiko+totalEquip+totalMob+totalExtras;
 
-  html+=`<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:18px">
+  html+=`<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:18px">
     ${[
       ['Total','#555',totalGeral],
       ['🎵 Instr.',  '#9b7cf6', totalPessoas],
       ['🥁 Taiko',  '#e05c5c', totalTaiko],
       ['🔊 Som',    '#5bafd6', totalEquip],
       ['🪑 Mob.',   '#6abf6a', totalMob],
+      ['🗂 Bases',  '#2a6070', totalExtras],
     ].map(([l,cor,n])=>`<div style="background:#111113;border:1px solid #1e1e22;border-radius:8px;padding:8px;text-align:center">
       <div style="font-size:18px;font-weight:700;color:${cor};font-family:'DM Mono',monospace">${n}</div>
       <div style="font-size:9px;color:#555;font-family:'DM Mono',monospace;margin-top:2px">${l}</div>
@@ -2140,10 +2148,7 @@ function openInventario(){
   const BASES_PRESET=[
     'Base Naname','Base Tatte','Base Shime Alta','Base Shime Chão','Base Suspensa','Base Yoko'
   ];
-  const extrasKey='inv_extras_'+curApres.id;
-  if(!window._invExtras) window._invExtras={};
   if(!window._invExtras[extrasKey]){
-    // Init with presets qty=0
     window._invExtras[extrasKey]=BASES_PRESET.map(nome=>({nome,qty:0}));
   }
 
