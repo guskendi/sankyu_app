@@ -171,6 +171,7 @@ button{font-family:inherit;cursor:pointer}
       <span class="saving" id="saving" style="display:none">salvando...</span>
       <button class="btn-hdr" onclick="openModalApres()">+ Apresentação</button>
       <button class="btn-hdr green" id="btn-pdf" onclick="exportPDF()" style="display:none">⬇ PDF</button>
+      <button class="btn-hdr" id="btn-inv" onclick="openInventario()" style="display:none;background:#1a2535;border-color:#1e3a50;color:#5bafd6">📋 Inventário</button>
       <a href="/producao" class="btn-hdr" style="text-decoration:none">← Produção</a>
     </div>
   </div>
@@ -298,6 +299,15 @@ button{font-family:inherit;cursor:pointer}
 </div>
 
 <!-- Modals -->
+<div class="overlay" id="m-inv" style="display:none" onclick="closeModal('m-inv')">
+<div class="modal" style="width:560px;max-height:85vh" onclick="event.stopPropagation()">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <h3 style="margin:0">📋 Inventário da Apresentação</h3>
+    <button class="btn-cancel" style="flex:none;padding:5px 10px" onclick="closeModal('m-inv')">Fechar</button>
+  </div>
+  <div id="inv-body"></div>
+</div></div>
+
 <div class="overlay" id="m-apres" style="display:none" onclick="closeModal('m-apres')">
 <div class="modal" onclick="event.stopPropagation()">
   <h3 id="m-apres-title">Nova apresentação</h3>
@@ -727,6 +737,12 @@ function drawElement(el, isSelected){
   const sr=r*SCALE;
 
   ctx.save();
+  // Apply rotation if set
+  if(el.rotation){
+    ctx.translate(x, y);
+    ctx.rotate(el.rotation * Math.PI / 180);
+    ctx.translate(-x, -y);
+  }
   if(isSelected){
     ctx.shadowColor='#8b7cf6';
     ctx.shadowBlur=12;
@@ -871,7 +887,9 @@ const SNAP_DIST = 8; // pixels in canvas coords — snap threshold
 let snapLines = { hx:[], vy:[], dist:[] };
 
 function applySnap(rawX, rawY, moving){
-  const others = elementos.filter(e=>e!==moving);
+  // grupo and texto are free — no snap
+  if(moving.type==='grupo'||moving.type==='texto') return {x:rawX,y:rawY};
+  const others = elementos.filter(e=>e!==moving && e.type!=='grupo' && e.type!=='texto');
   let x=rawX, y=rawY;
   let sx=null, sy=null;
 
@@ -1110,6 +1128,13 @@ function showInspector(el){
         <input type="range" min="14" max="40" value="${el.r||22}" oninput="updateSelected('r',parseInt(this.value));this.nextElementSibling.textContent=this.value" style="width:100%"/>
         <span style="font-size:10px;color:#555">${el.r||22}</span>
       </div>
+      <div class="ins-field"><label class="ins-label">Rotação</label>
+        <div style="display:flex;align-items:center;gap:8px">
+          <input type="range" min="-180" max="180" value="${el.rotation||0}" oninput="updateSelected('rotation',parseInt(this.value));this.nextElementSibling.textContent=this.value+'°'" style="flex:1"/>
+          <span style="font-size:10px;color:#555;min-width:32px">${el.rotation||0}°</span>
+          <button onclick="updateSelected('rotation',0)" style="background:none;border:1px solid #2a2a2e;border-radius:5px;color:#888;font-size:10px;padding:2px 6px;cursor:pointer">↺</button>
+        </div>
+      </div>
       <button class="btn-del-el" onclick="deleteSelected()">🗑 Remover do palco</button>`;
   } else {
     const extraOpts=(ACCESSORIES_EQUIP[el.type]||[]);
@@ -1127,6 +1152,13 @@ function showInspector(el){
       <div class="ins-field"><label class="ins-label">Tamanho</label>
         <input type="range" min="12" max="36" value="${el.r||18}" oninput="updateSelected('r',parseInt(this.value));this.nextElementSibling.textContent=this.value" style="width:100%"/>
         <span style="font-size:10px;color:#555">${el.r||18}</span>
+      </div>
+      <div class="ins-field"><label class="ins-label">Rotação</label>
+        <div style="display:flex;align-items:center;gap:8px">
+          <input type="range" min="-180" max="180" value="${el.rotation||0}" oninput="updateSelected('rotation',parseInt(this.value));this.nextElementSibling.textContent=this.value+'°'" style="flex:1"/>
+          <span style="font-size:10px;color:#555;min-width:32px">${el.rotation||0}°</span>
+          <button onclick="updateSelected('rotation',0)" style="background:none;border:1px solid #2a2a2e;border-radius:5px;color:#888;font-size:10px;padding:2px 6px;cursor:pointer">↺</button>
+        </div>
       </div>
       <button class="btn-del-el" onclick="deleteSelected()">🗑 Remover do palco</button>`;
   }
@@ -1204,6 +1236,7 @@ async function loadApres(id){
   document.getElementById('btn-edit-apres').style.display='inline';
   document.getElementById('btn-del-apres').style.display='inline';
   document.getElementById('btn-pdf').style.display='inline';
+  document.getElementById('btn-inv').style.display='inline';
   document.getElementById('hdr-apres-nome').textContent=d.nome;
   renderSetlist();
   if(curMusicas.length>0){ curMusicaIdx=0; loadMusica(0); showCanvas(); }
@@ -1751,6 +1784,95 @@ async function exportPDF(){
     </style></head><body>`);
 
     // 1 música por página
+    // ── Capa com inventário ───────────────────────────────────────────────────
+    // Build inventory counts same as openInventario()
+    const EQUIP_CATS_PDF={pedestal:'equipamento',microfone:'equipamento',cadeira:'mobiliário',estante:'mobiliário',caixa:'equipamento',
+      okedo:'taiko',shime:'taiko',hirado:'taiko',nagado:'taiko',katsugi:'taiko',koto:'instrumento'};
+    const catLabelsPDF={instrumento:'🎵 Instrumentos',taiko:'🥁 Taiko',equipamento:'🔊 Equipamentos de som',mobiliário:'🪑 Mobiliário'};
+    const maxC={}, kInfo={};
+    const apresMusicas=apresData.musicas||[];
+    apresMusicas.forEach(m=>{
+      const mc={};
+      (m.elementos||[]).forEach(e=>{
+        if(['grupo','texto'].includes(e.type)) return;
+        let key,label,cat;
+        if(e.type==='pessoa'){
+          const instr=e.instrumento||'(sem instrumento)';
+          const acc=e.acessorio||'';
+          key='p:'+instr+(acc?'+'+acc:'');
+          label=instr+(acc?' c/ '+acc:'');
+          cat='instrumento';
+        } else {
+          const acc=e.acessorio||'';
+          key=e.type+(acc?':'+acc:'');
+          label=(EQUIP_LABELS[e.type]||e.type)+(acc?' — '+acc:'');
+          cat=EQUIP_CATS_PDF[e.type]||'equipamento';
+        }
+        mc[key]=(mc[key]||0)+1;
+        if(!kInfo[key]) kInfo[key]={label,cat,musicas:new Set()};
+        kInfo[key].musicas.add(m.nome);
+      });
+      Object.entries(mc).forEach(([k,v])=>{ maxC[k]=Math.max(maxC[k]||0,v); });
+    });
+    const catsPDF={instrumento:[],taiko:[],equipamento:[],'mobiliário':[]};
+    Object.entries(maxC).forEach(([k,qty])=>{
+      const info=kInfo[k]; if(!info) return;
+      if(!catsPDF[info.cat]) catsPDF[info.cat]=[];
+      catsPDF[info.cat].push({label:info.label,qty,musicas:[...info.musicas]});
+    });
+    const totP=Object.entries(maxC).filter(([k])=>k.startsWith('p:')).reduce((s,[,v])=>s+v,0);
+    const totT=Object.entries(maxC).filter(([k])=>kInfo[k]?.cat==='taiko').reduce((s,[,v])=>s+v,0);
+    const totE=Object.entries(maxC).filter(([k])=>kInfo[k]?.cat==='equipamento').reduce((s,[,v])=>s+v,0);
+    const totM=Object.entries(maxC).filter(([k])=>kInfo[k]?.cat==='mobiliário').reduce((s,[,v])=>s+v,0);
+
+    let invHtml='';
+    Object.entries(catsPDF).forEach(([cat,items])=>{
+      if(!items.length) return;
+      items.sort((a,b)=>a.label.localeCompare(b.label));
+      invHtml+=`<div style="margin-bottom:10px">
+        <div style="font-size:8px;font-weight:700;color:#16404D;font-family:'DM Mono',monospace;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;padding-bottom:2px;border-bottom:1px solid #e0ddd5">${catLabelsPDF[cat]||cat}</div>
+        ${items.map(it=>`<div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid #f0eeea">
+          <div style="background:#16404D;border-radius:4px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0;font-family:'DM Mono',monospace">${it.qty}</div>
+          <div style="flex:1">
+            <div style="font-size:10px;color:#222;font-weight:500">${it.label}</div>
+            <div style="font-size:8px;color:#aaa;font-family:'DM Mono',monospace">${it.musicas.join(' · ')}</div>
+          </div>
+        </div>`).join('')}
+      </div>`;
+    });
+
+    // Write cover page
+    w.document.write(`<div class="page" style="justify-content:space-between">
+      <div>
+        <div style="display:flex;align-items:center;gap:14px;padding-bottom:6mm;border-bottom:3px solid #16404D;margin-bottom:6mm">
+          <img src="${LOGO_B64}" style="height:48px;width:auto"/>
+          <div>
+            <div style="font-size:8px;letter-spacing:.2em;text-transform:uppercase;color:#16404D;font-family:'DM Mono',monospace;margin-bottom:4px">Escola de Música Japonesa</div>
+            <div style="font-size:22px;font-weight:700;color:#111">${apresNome}</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4mm;margin-bottom:6mm">
+          ${curApres.local?`<div><div style="font-size:8px;color:#aaa;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px">Local</div><div style="font-size:12px;font-weight:600;color:#222">${curApres.local}</div></div>`:''}
+          ${curApres.data?`<div><div style="font-size:8px;color:#aaa;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px">Data</div><div style="font-size:12px;font-weight:600;color:#222">${fmtDate(curApres.data)}</div></div>`:''}
+          <div><div style="font-size:8px;color:#aaa;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px">Total de músicas</div><div style="font-size:12px;font-weight:600;color:#222">${totalMusicas}</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:3mm;margin-bottom:6mm">
+          ${[['🎵 Instr.',totP,'#16404D'],['🥁 Taiko',totT,'#c0392b'],['🔊 Som',totE,'#1565a8'],['🪑 Mob.',totM,'#2e7d4f']].map(([l,n,c])=>`
+          <div style="background:#f8f7f5;border:1px solid #e0ddd5;border-radius:6px;padding:6px;text-align:center">
+            <div style="font-size:20px;font-weight:700;color:${c};font-family:'DM Mono',monospace">${n}</div>
+            <div style="font-size:8px;color:#888;margin-top:2px">${l}</div>
+          </div>`).join('')}
+        </div>
+        <div style="font-size:9px;font-weight:700;color:#16404D;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4mm;font-family:'DM Mono',monospace">Inventário de Materiais</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4mm">
+          ${Object.entries(catsPDF).filter(([,items])=>items.length).map(([cat,items],i)=>`
+          <div>${invHtml.match(new RegExp('<div style="margin-bottom:10px">[\\s\\S]*?</div>\\s*</div>','g'))?.[i]||''}</div>`).join('')}
+        </div>
+      </div>
+      <div style="text-align:right;font-size:8px;color:#ccc;font-family:'DM Mono',monospace;border-top:1px solid #e0ddd5;padding-top:3mm">Posicionamento de Palco · Sankyu · ${apresNome}</div>
+    </div>`);
+
+    // ── Páginas de músicas ────────────────────────────────────────────────────
     pages.forEach(({canvas,musica,num},pi)=>{
       const dataUrl=canvas.toDataURL('image/png');
       const pessoas=(musica.elementos||[]).filter(e=>e.type==='pessoa');
@@ -1828,6 +1950,9 @@ function drawElementOnCtx(cx, el, isSelected, scale){
   const r=el.r||22, sr=r*scale;
   const acc=el.acessorio||'';
   cx.save();
+  if(el.rotation){
+    cx.translate(x,y); cx.rotate(el.rotation*Math.PI/180); cx.translate(-x,-y);
+  }
 
   if(el.type==='pessoa'){
     // Accessory badge behind circle
@@ -1909,6 +2034,93 @@ window.addEventListener('resize',()=>{if(curApres) setupCanvas();});
     }
   }catch(e){}
 })();
+
+
+// ── Inventário ────────────────────────────────────────────────────────────────
+
+function openInventario(){
+  if(!curApres){ alert('Selecione uma apresentação.'); return; }
+
+  const EQUIP_CATS={pedestal:'equipamento',microfone:'equipamento',cadeira:'mobiliário',estante:'mobiliário',caixa:'equipamento',
+    okedo:'taiko',shime:'taiko',hirado:'taiko',nagado:'taiko',katsugi:'taiko',koto:'instrumento'};
+  const catLabels={instrumento:'🎵 Instrumentos',taiko:'🥁 Taiko',equipamento:'🔊 Equipamentos de som',mobiliário:'🪑 Mobiliário'};
+
+  // max concurrent count per key across all musicas
+  const maxCounts={};
+  const keyInfo={};
+
+  curMusicas.forEach(m=>{
+    const mc={};
+    (m.elementos||[]).forEach(e=>{
+      if(['grupo','texto'].includes(e.type)) return;
+      let key,label,cat;
+      if(e.type==='pessoa'){
+        const instr=e.instrumento||'(sem instrumento)';
+        const acc=e.acessorio||'';
+        key='p:'+instr+(acc?'+'+acc:'');
+        label=instr+(acc?' c/ '+acc:'');
+        cat='instrumento';
+      } else {
+        const acc=e.acessorio||'';
+        key=e.type+(acc?':'+acc:'');
+        label=(EQUIP_LABELS[e.type]||e.type)+(acc?' — '+acc:'');
+        cat=EQUIP_CATS[e.type]||'equipamento';
+      }
+      mc[key]=(mc[key]||0)+1;
+      if(!keyInfo[key]) keyInfo[key]={label,cat,musicas:new Set()};
+      keyInfo[key].musicas.add(m.nome);
+    });
+    Object.entries(mc).forEach(([k,v])=>{ maxCounts[k]=Math.max(maxCounts[k]||0,v); });
+  });
+
+  const cats={instrumento:[],taiko:[],equipamento:[],'mobiliário':[]};
+  Object.entries(maxCounts).forEach(([k,qty])=>{
+    const info=keyInfo[k]; if(!info) return;
+    if(!cats[info.cat]) cats[info.cat]=[];
+    cats[info.cat].push({label:info.label,qty,musicas:info.musicas});
+  });
+
+  let html=`<div style="font-size:11px;color:#555;font-family:'DM Mono',monospace;margin-bottom:14px">Quantidade máxima simultânea · ${curMusicas.length} música(s)</div>`;
+  let any=false;
+
+  // Summary bar
+  const totalPessoas=Object.entries(maxCounts).filter(([k])=>k.startsWith('p:')).reduce((s,[,v])=>s+v,0);
+  const totalTaiko=Object.entries(maxCounts).filter(([k])=>keyInfo[k]?.cat==='taiko').reduce((s,[,v])=>s+v,0);
+  const totalEquip=Object.entries(maxCounts).filter(([k])=>keyInfo[k]?.cat==='equipamento').reduce((s,[,v])=>s+v,0);
+  const totalMob=Object.entries(maxCounts).filter(([k])=>keyInfo[k]?.cat==='mobiliário').reduce((s,[,v])=>s+v,0);
+  const totalGeral=totalPessoas+totalTaiko+totalEquip+totalMob;
+
+  html+=`<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:18px">
+    ${[
+      ['Total','#555',totalGeral],
+      ['🎵 Instr.',  '#9b7cf6', totalPessoas],
+      ['🥁 Taiko',  '#e05c5c', totalTaiko],
+      ['🔊 Som',    '#5bafd6', totalEquip],
+      ['🪑 Mob.',   '#6abf6a', totalMob],
+    ].map(([l,cor,n])=>`<div style="background:#111113;border:1px solid #1e1e22;border-radius:8px;padding:8px;text-align:center">
+      <div style="font-size:18px;font-weight:700;color:${cor};font-family:'DM Mono',monospace">${n}</div>
+      <div style="font-size:9px;color:#555;font-family:'DM Mono',monospace;margin-top:2px">${l}</div>
+    </div>`).join('')}
+  </div>`;
+  Object.entries(cats).forEach(([cat,items])=>{
+    if(!items.length) return; any=true;
+    items.sort((a,b)=>a.label.localeCompare(b.label));
+    html+=`<div style="margin-bottom:16px">
+      <div style="font-size:10px;font-weight:600;color:#8b7cf6;font-family:'DM Mono',monospace;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #1e1e22">${catLabels[cat]||cat}</div>
+      ${items.map(it=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #151518">
+        <div style="background:#1a1628;border:1px solid #5c4db1;border-radius:6px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#9b7cf6;flex-shrink:0;font-family:'DM Mono',monospace">${it.qty}</div>
+        <div style="flex:1">
+          <div style="font-size:13px;color:#e0ddd5;font-weight:500">${it.label}</div>
+          <div style="font-size:10px;color:#555;font-family:'DM Mono',monospace">${[...it.musicas].join(' · ')}</div>
+        </div>
+      </div>`).join('')}
+    </div>`;
+  });
+  if(!any) html='<div style="text-align:center;padding:32px;color:#555;font-style:italic">Nenhum elemento posicionado ainda.</div>';
+
+  document.getElementById('inv-body').innerHTML=html;
+  document.getElementById('m-inv').style.display='flex';
+}
 
 // Init
 loadAll();
