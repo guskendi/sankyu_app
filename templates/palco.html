@@ -1910,7 +1910,7 @@ async function exportPDF(){
     apresMusicas.forEach(m=>{
       const mc={};
       (m.elementos||[]).forEach(e=>{
-        if(['grupo','texto'].includes(e.type)) return;
+        if(['grupo','texto','seta'].includes(e.type)) return;
         let key,label,cat;
         if(e.type==='pessoa'){
           const instr=e.instrumento||'';
@@ -2201,7 +2201,7 @@ function openInventario(){
   curMusicas.forEach(m=>{
     const mc={};
     (m.elementos||[]).forEach(e=>{
-      if(['grupo','texto'].includes(e.type)) return;
+      if(['grupo','texto','seta'].includes(e.type)) return;
       let key,label,cat;
       if(e.type==='pessoa'){
         const instr=e.instrumento||'';
