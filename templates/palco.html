@@ -378,6 +378,9 @@ button{font-family:inherit;cursor:pointer}
 // ── State ─────────────────────────────────────────────────────────────────────
 let apresentacoes=[], pessoas=[], curApres=null, curMusicas=[], curMusicaIdx=0, curMusicaId=null;
 let elementos=[], selected=null, draggingType=null, draggingEl=null;
+let selectedSet=new Set(); // multi-select
+let clipboard=[]; // copy-paste buffer
+let lasso=null; // {x,y,w,h} lasso rect while dragging
 let editApresId=null, editPessoaId=null, editMusicaId=null;
 let playTimer=null, playIdx=0, isPlaying=false;
 let autoSaveTimer=null;
@@ -485,11 +488,32 @@ function draw(animEls=null){
   ctx.fillText('PALCO', W/2, 12*SCALE);
 
   // Draw setas first (behind everything)
-  els.filter(el=>el.type==='seta').forEach(el=>drawElement(el, el===selected));
+  els.filter(el=>el.type==='seta').forEach(el=>drawElement(el, el===selected||selectedSet.has(el.id)));
   // Draw grupos (behind people but above setas)
-  els.filter(el=>el.type==='grupo').forEach(el=>drawElement(el, el===selected));
+  els.filter(el=>el.type==='grupo').forEach(el=>drawElement(el, el===selected||selectedSet.has(el.id)));
   // Draw remaining elements on top
-  els.filter(el=>el.type!=='grupo'&&el.type!=='seta').forEach(el=>drawElement(el, el===selected));
+  els.filter(el=>el.type!=='grupo'&&el.type!=='seta').forEach(el=>drawElement(el, el===selected||selectedSet.has(el.id)));
+
+  // Draw lasso rect
+  if(lasso){
+    ctx.save();
+    ctx.strokeStyle='#8b7cf6'; ctx.lineWidth=1.5;
+    ctx.setLineDash([5,4]);
+    ctx.fillStyle='rgba(139,124,246,0.08)';
+    ctx.fillRect(lasso.x*SCALE,lasso.y*SCALE,lasso.w*SCALE,lasso.h*SCALE);
+    ctx.strokeRect(lasso.x*SCALE,lasso.y*SCALE,lasso.w*SCALE,lasso.h*SCALE);
+    ctx.restore();
+  }
+
+  // Multi-select count badge
+  if(selectedSet.size>0){
+    ctx.save();
+    ctx.fillStyle='#8b7cf6';
+    ctx.font=`bold ${Math.round(11*SCALE)}px DM Mono,monospace`;
+    ctx.textAlign='left'; ctx.textBaseline='top';
+    ctx.fillText(`${selectedSet.size} selecionados  ⌫ Deletar  ⌘C Copiar`,8*SCALE,8*SCALE);
+    ctx.restore();
+  }
 
   // Draw snap guide lines on top (only when dragging, not during animation)
   if(animEls===null && (snapLines.hx.length>0 || snapLines.vy.length>0 || (snapLines.dist&&snapLines.dist.length>0))){
@@ -923,27 +947,49 @@ function shortName(nome){
 
 // ── Canvas mouse events ───────────────────────────────────────────────────────
 let mouseDown=false, mouseOffset={x:0,y:0};
+let lassoStart=null, movingMulti=false, multiMoveStart={x:0,y:0};
 
 canvas.addEventListener('mousedown',e=>{
   const pos=canvasPos(e);
   const hit=hitTest(pos.x,pos.y);
+
   if(hit){
     const el=hit.el||hit;
     if(hit.pt && el.type==='seta'){
-      // dragging a seta control point
       draggingSetaPt={el, pt:hit.pt};
-      selected=el; showInspector(el);
+      selected=el; selectedSet.clear(); showInspector(el);
     } else if(hit.resize && el.type==='grupo'){
       resizingGrupo=el;
       grupoResizeStart={x:pos.x,y:pos.y,w:el.w||120,h:el.h||80};
-      selected=el; showInspector(el);
+      selected=el; selectedSet.clear(); showInspector(el);
     } else {
-      selected=el; mouseDown=true;
-      mouseOffset={x:pos.x-el.x,y:pos.y-el.y};
-      showInspector(el);
+      // Shift+click to add/remove from multi-select
+      if(e.shiftKey){
+        if(selectedSet.has(el.id)) selectedSet.delete(el.id);
+        else selectedSet.add(el.id);
+        selected=null; hideInspector();
+      } else if(selectedSet.has(el.id) && selectedSet.size>1){
+        // clicking an already-selected element starts group move
+        movingMulti=true;
+        multiMoveStart={x:pos.x,y:pos.y};
+        elementos.forEach(el=>{
+          if(selectedSet.has(el.id)){
+            el._ox=el.x; el._oy=el.y;
+            if(el.type==='seta'){ el._ox1=el.x1;el._oy1=el.y1;el._ox2=el.x2;el._oy2=el.y2;el._ocx=el.cx;el._ocy=el.cy; }
+          }
+        });
+      } else {
+        selectedSet.clear();
+        selected=el; mouseDown=true;
+        mouseOffset={x:pos.x-el.x,y:pos.y-el.y};
+        showInspector(el);
+      }
     }
   } else {
-    selected=null; hideInspector();
+    // Start lasso
+    selectedSet.clear(); selected=null; hideInspector();
+    lassoStart={x:pos.x,y:pos.y};
+    lasso={x:pos.x,y:pos.y,w:0,h:0};
   }
   draw();
 });
@@ -1021,7 +1067,6 @@ canvas.addEventListener('mousemove',e=>{
     if(pt==='start'){ el.x1=Math.round(pos.x); el.y1=Math.round(pos.y); }
     else if(pt==='end'){ el.x2=Math.round(pos.x); el.y2=Math.round(pos.y); }
     else if(pt==='ctrl'){ el.cx=Math.round(pos.x); el.cy=Math.round(pos.y); }
-    // update centroid for move
     el.x=Math.round((el.x1+el.x2)/2); el.y=Math.round((el.y1+el.y2)/2);
     draw(); scheduleAutoSave(); return;
   }
@@ -1031,6 +1076,31 @@ canvas.addEventListener('mousemove',e=>{
     resizingGrupo.w=Math.max(40, grupoResizeStart.w+dx*2);
     resizingGrupo.h=Math.max(30, grupoResizeStart.h+dy*2);
     draw(); scheduleAutoSave(); return;
+  }
+  // lasso
+  if(lassoStart){
+    const lx=Math.min(lassoStart.x,pos.x), ly=Math.min(lassoStart.y,pos.y);
+    lasso={x:lx,y:ly,w:Math.abs(pos.x-lassoStart.x),h:Math.abs(pos.y-lassoStart.y)};
+    draw(); return;
+  }
+  // multi move
+  if(movingMulti){
+    const dx=pos.x-multiMoveStart.x, dy=pos.y-multiMoveStart.y;
+    const audH=Math.round(PALCO_H*0.14);
+    elementos.forEach(el=>{
+      if(!selectedSet.has(el.id)) return;
+      if(el.type==='seta'){
+        el.x1=Math.round(el._ox1+dx); el.y1=Math.round(el._oy1+dy);
+        el.x2=Math.round(el._ox2+dx); el.y2=Math.round(el._oy2+dy);
+        el.cx=Math.round(el._ocx+dx); el.cy=Math.round(el._ocy+dy);
+        el.x=Math.round((el.x1+el.x2)/2); el.y=Math.round((el.y1+el.y2)/2);
+      } else {
+        const r=el.r||22;
+        el.x=Math.max(r,Math.min(PALCO_W-r,Math.round(el._ox+dx)));
+        el.y=Math.max(r,Math.min(PALCO_H-audH-r,Math.round(el._oy+dy)));
+      }
+    });
+    draw(); return;
   }
   if(!mouseDown||!selected) return;
   let rawX=Math.round(pos.x-mouseOffset.x);
@@ -1049,12 +1119,25 @@ canvas.addEventListener('mousemove',e=>{
 });
 
 canvas.addEventListener('mouseup',()=>{
+  // finalize lasso — select elements inside rect
+  if(lassoStart && lasso && (lasso.w>4||lasso.h>4)){
+    elementos.forEach(el=>{
+      const inLasso=(el.x>=lasso.x&&el.x<=lasso.x+lasso.w&&
+                     el.y>=lasso.y&&el.y<=lasso.y+lasso.h);
+      if(inLasso) selectedSet.add(el.id);
+    });
+    if(selectedSet.size>0) hideInspector();
+  }
+  if(movingMulti) scheduleAutoSave();
   mouseDown=false; resizingGrupo=null; draggingSetaPt=null;
+  lassoStart=null; lasso=null; movingMulti=false;
   snapLines={hx:[],vy:[],dist:[]};
   draw();
 });
 canvas.addEventListener('mouseleave',()=>{
+  if(movingMulti) scheduleAutoSave();
   mouseDown=false; resizingGrupo=null; draggingSetaPt=null;
+  lassoStart=null; lasso=null; movingMulti=false;
   snapLines={hx:[],vy:[],dist:[]};
 });
 
@@ -1466,10 +1549,11 @@ async function selectMusica(idx){
 
 function loadMusica(idx){
   if(!curMusicas[idx]) return;
-  curMusicaId=curMusicas[idx].id; // track by id, not index
+  curMusicaId=curMusicas[idx].id;
   elementos=JSON.parse(JSON.stringify(curMusicas[idx].elementos||[]));
-  selected=null; hideInspector();
-  setupCanvas(); // also draws
+  selected=null; selectedSet=new Set(); lasso=null;
+  hideInspector();
+  setupCanvas();
 }
 
 function showCanvas(){
@@ -2161,6 +2245,63 @@ function drawElementOnCtx(cx, el, isSelected, scale){
 function closeModal(id){document.getElementById(id).style.display='none';}
 
 window.addEventListener('resize',()=>{if(curApres) setupCanvas();});
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────────
+document.addEventListener('keydown',e=>{
+  const tag=document.activeElement?.tagName;
+  if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT') return;
+
+  // Delete / Backspace — delete selected or multi-selected
+  if(e.key==='Delete'||e.key==='Backspace'){
+    if(selectedSet.size>0){
+      elementos=elementos.filter(el=>!selectedSet.has(el.id));
+      selectedSet.clear(); hideInspector();
+      draw(); scheduleAutoSave();
+    } else if(selected){
+      deleteSelected();
+    }
+    e.preventDefault();
+  }
+
+  // Ctrl/Cmd + C — copy
+  if((e.ctrlKey||e.metaKey) && e.key==='c'){
+    const toCopy=selectedSet.size>0
+      ? elementos.filter(el=>selectedSet.has(el.id))
+      : selected ? [selected] : [];
+    if(toCopy.length>0){
+      clipboard=JSON.parse(JSON.stringify(toCopy));
+      // show brief feedback
+      const badge=document.createElement('div');
+      badge.style.cssText='position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:#1a1628;border:1px solid #5c4db1;color:#9b7cf6;padding:6px 16px;border-radius:20px;font-size:11px;font-family:DM Mono,monospace;z-index:999;pointer-events:none';
+      badge.textContent=`${toCopy.length} elemento(s) copiado(s)`;
+      document.body.appendChild(badge);
+      setTimeout(()=>badge.remove(),2000);
+    }
+    e.preventDefault();
+  }
+
+  // Ctrl/Cmd + V — paste (offset +20px so they don't overlap)
+  if((e.ctrlKey||e.metaKey) && e.key==='v'){
+    if(clipboard.length>0 && curMusicas[curMusicaIdx]){
+      const pasted=clipboard.map(el=>{
+        const novo={...JSON.parse(JSON.stringify(el)), id:Date.now()+Math.random()};
+        if(novo.type==='seta'){ novo.x1+=20;novo.y1+=20;novo.x2+=20;novo.y2+=20;novo.cx+=20;novo.cy+=20; }
+        novo.x+=20; novo.y+=20;
+        return novo;
+      });
+      elementos.push(...pasted);
+      selectedSet=new Set(pasted.map(el=>el.id));
+      selected=null; hideInspector();
+      draw(); scheduleAutoSave();
+    }
+    e.preventDefault();
+  }
+
+  // Escape — clear selection
+  if(e.key==='Escape'){
+    selectedSet.clear(); selected=null; hideInspector(); draw();
+  }
+});
 
 // Load logo
 (async()=>{
