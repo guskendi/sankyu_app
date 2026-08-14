@@ -765,16 +765,22 @@ class Apresentacao(db.Model):
     nome        = db.Column(db.String(200), nullable=False)
     local       = db.Column(db.String(200), default="")
     data        = db.Column(db.String(50), default="")
-    palco_w     = db.Column(db.Integer, default=800)   # largura em px (proporcional)
-    palco_h     = db.Column(db.Integer, default=500)   # altura em px
+    palco_w     = db.Column(db.Integer, default=800)
+    palco_h     = db.Column(db.Integer, default=500)
     obs         = db.Column(db.Text, default="")
+    extras      = db.Column(db.Text, default="[]")  # JSON [{nome, qty}]
     criado_em   = db.Column(db.DateTime, default=datetime.utcnow)
     musicas     = db.relationship("PalcoMusica", backref="apresentacao",
                                   cascade="all,delete-orphan", order_by="PalcoMusica.ordem")
 
     def to_dict(self):
+        try:
+            extras = json.loads(self.extras) if self.extras else []
+        except Exception:
+            extras = []
         return {"id":self.id,"nome":self.nome,"local":self.local,"data":self.data,
                 "palcoW":self.palco_w,"palcoH":self.palco_h,"obs":self.obs,
+                "extras":extras,
                 "criadoEm":self.criado_em.isoformat() if self.criado_em else None,
                 "totalMusicas":len(self.musicas)}
 
@@ -843,6 +849,7 @@ def palco_update_apres(aid):
         if f in d: setattr(a, f, d[f])
     if "palcoW" in d: a.palco_w = int(d["palcoW"])
     if "palcoH" in d: a.palco_h = int(d["palcoH"])
+    if "extras" in d: a.extras = json.dumps(d["extras"])
     db.session.commit(); return jsonify(a.to_dict())
 
 @app.route("/api/palco/apresentacoes/<int:aid>", methods=["DELETE"])

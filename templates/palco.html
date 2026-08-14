@@ -1232,6 +1232,8 @@ async function loadApres(id){
     return; }
   const d=await api(`/api/palco/apresentacoes/${id}`);
   curApres=d; curMusicas=d.musicas||[];
+  // Pre-load extras into memory so inventory is fresh
+  if(window._invExtras) delete window._invExtras['inv_extras_'+d.id];
   PALCO_W=d.palcoW||800; PALCO_H=d.palcoH||500;
   document.getElementById('btn-edit-apres').style.display='inline';
   document.getElementById('btn-del-apres').style.display='inline';
@@ -2110,7 +2112,8 @@ function openInventario(){
   if(!window._invExtras) window._invExtras={};
   if(!window._invExtras[extrasKey]){
     const BASES_PRESET=['Base Naname','Base Tatte','Base Shime Alta','Base Shime Chão','Base Suspensa','Base Yoko'];
-    window._invExtras[extrasKey]=BASES_PRESET.map(nome=>({nome,qty:0}));
+    const serverExtras=curApres.extras||[];
+    window._invExtras[extrasKey]=serverExtras.length>0 ? serverExtras : BASES_PRESET.map(nome=>({nome,qty:0}));
   }
   const totalExtras=(window._invExtras[extrasKey]||[]).reduce((s,e)=>s+(parseInt(e.qty)||0),0);
   const totalGeral=totalPessoas+totalTaiko+totalEquip+totalMob+totalExtras;
@@ -2145,12 +2148,7 @@ function openInventario(){
   if(!any) html='<div style="text-align:center;padding:32px;color:#555;font-style:italic">Nenhum elemento posicionado ainda.</div>';
 
   // ── Itens extras (bases e outros) ─────────────────────────────────────────
-  const BASES_PRESET=[
-    'Base Naname','Base Tatte','Base Shime Alta','Base Shime Chão','Base Suspensa','Base Yoko'
-  ];
-  if(!window._invExtras[extrasKey]){
-    window._invExtras[extrasKey]=BASES_PRESET.map(nome=>({nome,qty:0}));
-  }
+  // extras already initialized above in summary bar
 
   html+=`<div style="margin-top:18px;padding-top:14px;border-top:1px solid #1e1e22">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -2163,6 +2161,12 @@ function openInventario(){
   document.getElementById('inv-body').innerHTML=html;
   renderInvExtras();
   document.getElementById('m-inv').style.display='flex';
+}
+
+async function saveExtras(){
+  if(!curApres) return;
+  const k='inv_extras_'+curApres.id;
+  await api(`/api/palco/apresentacoes/${curApres.id}`,'PUT',{extras:window._invExtras[k]||[]});
 }
 
 function renderInvExtras(){
@@ -2187,22 +2191,26 @@ function invSetQty(i,val){
   if(!curApres) return;
   const k='inv_extras_'+curApres.id;
   window._invExtras[k][i].qty=parseInt(val)||0;
+  saveExtras();
 }
 function invSetNome(i,val){
   if(!curApres) return;
   const k='inv_extras_'+curApres.id;
   window._invExtras[k][i].nome=val;
+  saveExtras();
 }
 function invRemoveExtra(i){
   if(!curApres) return;
   const k='inv_extras_'+curApres.id;
   window._invExtras[k].splice(i,1);
+  saveExtras();
   renderInvExtras();
 }
 function invAddExtra(){
   if(!curApres) return;
   const k='inv_extras_'+curApres.id;
   window._invExtras[k].push({nome:'',qty:0});
+  saveExtras();
   renderInvExtras();
   // focus last input
   setTimeout(()=>{
